@@ -3763,20 +3763,26 @@ kbd {
   align-items: center;
   justify-content: center;
   padding: 16px;
+  box-sizing: border-box;
   animation: fadeInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.modal-dialog.price-selector-modal,
 .price-selector-modal {
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  width: 100%;
-  max-width: 440px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: scaleUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  width: 100% !important;
+  max-width: 440px !important;
+  max-height: 85vh !important;
+  max-height: 85dvh !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  animation: scaleUpModal 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeInModal {
@@ -3789,45 +3795,97 @@ kbd {
   to { transform: scale(1); opacity: 1; }
 }
 
-/* Pinned Modal Header */
+/* ==========================================================================
+   Header (Fixed / Non-Scrolling)
+   ========================================================================== */
 .price-selector-header {
-  padding: 16px 20px;
-  background: #f8fafc;
+  padding: 12px 16px;
+  background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.price-selector-title-wrap {
+.price-selector-prod-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-.price-selector-icon {
-  color: #059669;
+/* Compact Product Thumbnail: Strictly bounded to 68x80px */
+.price-selector-thumb {
+  width: 70px;
+  height: 82px;
+  min-width: 70px;
+  max-width: 70px;
+  min-height: 82px;
+  max-height: 82px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   flex-shrink: 0;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.price-selector-thumb img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.price-selector-prod-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .price-selector-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.price-selector-base-hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.price-selector-base-hint strong {
+  color: #047857;
+  font-weight: 700;
 }
 
 .price-selector-close-btn {
   background: transparent;
   border: none;
   color: #64748b;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -3835,48 +3893,29 @@ kbd {
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .price-selector-close-btn:hover {
-  background: #e2e8f0;
+  background: #f1f5f9;
   color: #0f172a;
 }
 
-/* Scrollable Modal Body */
+/* ==========================================================================
+   Scrollable Body (Flex: 1; min-height: 0; overflow-y: auto)
+   ========================================================================== */
 .price-selector-body {
-  padding: 18px 20px;
+  padding: 14px 16px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1 1 auto;
+  min-height: 0; /* Prevents overflow escaping flex container */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  box-sizing: border-box;
 }
 
-/* Product Info Banner */
-.price-selector-product-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 10px;
-  padding: 10px 14px;
-}
-
-.product-banner-name {
-  font-weight: 600;
-  color: #065f46;
-  font-size: 0.95rem;
-}
-
-.product-banner-base {
-  font-size: 0.85rem;
-  color: #047857;
-  font-weight: 500;
-}
-
-/* Preset & Reduction Button Grids */
 .price-selector-section {
   display: flex;
   flex-direction: column;
@@ -3891,42 +3930,62 @@ kbd {
   color: #64748b;
 }
 
-.price-preset-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+/* Standard Rate & Offers */
+.price-pill-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.price-preset-btn {
-  padding: 9px 12px;
+.price-pill-btn {
+  padding: 8px 14px;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #334155;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.15s ease;
   min-height: 42px;
+  box-sizing: border-box;
 }
 
-.price-preset-btn:hover {
+.price-pill-btn:hover {
   border-color: #059669;
   color: #059669;
   background: #ecfdf5;
 }
 
-.price-preset-btn.active {
+.price-pill-btn.active {
   border-color: #059669;
   background: #059669;
   color: #ffffff;
   box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
 }
 
+.price-pill-btn.offer {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.price-pill-btn.offer:hover {
+  border-color: #059669;
+  background: #d1fae5;
+}
+
+.price-pill-btn.offer.active {
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
+}
+
+/* Quick Reductions (-10, -20, -50, Reset) */
 .quick-red-btn-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3945,6 +4004,7 @@ kbd {
   transition: all 0.15s ease;
   text-align: center;
   min-height: 40px;
+  box-sizing: border-box;
 }
 
 .quick-red-btn:hover {
@@ -3967,7 +4027,7 @@ kbd {
 .price-qty-row {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -3993,7 +4053,7 @@ kbd {
 
 .currency-prefix {
   position: absolute;
-  left: 12px;
+  left: 10px;
   font-size: 1.05rem;
   font-weight: 700;
   color: #64748b;
@@ -4002,15 +4062,16 @@ kbd {
 
 .custom-price-input {
   width: 100%;
-  height: 46px;
-  padding-left: 28px;
-  padding-right: 10px;
-  font-size: 1.15rem;
+  height: 44px;
+  padding-left: 26px;
+  padding-right: 8px;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #0f172a;
   border: 2px solid #cbd5e1;
   border-radius: 8px;
   outline: none;
+  box-sizing: border-box;
   transition: border-color 0.15s ease;
 }
 
@@ -4024,20 +4085,23 @@ kbd {
   background: #fffbeb;
 }
 
-/* Quantity Stepper with Large Buttons */
+/* Quantity Stepper with >= 44px Touch Targets */
 .qty-stepper-box {
   display: flex;
   align-items: center;
   border: 2px solid #cbd5e1;
   border-radius: 8px;
   overflow: hidden;
-  height: 46px;
+  height: 44px;
   background: #ffffff;
+  box-sizing: border-box;
 }
 
 .qty-step-btn {
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   background: #f8fafc;
   border: none;
   color: #1e293b;
@@ -4047,6 +4111,7 @@ kbd {
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .qty-step-btn:hover:not(:disabled) {
@@ -4072,6 +4137,7 @@ kbd {
   color: #0f172a;
   outline: none;
   padding: 0;
+  box-sizing: border-box;
   appearance: textfield;
   -moz-appearance: textfield;
 }
@@ -4084,14 +4150,15 @@ kbd {
 
 /* Alerts inside modal */
 .price-alert-box {
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
 .price-alert-box.warning {
@@ -4106,9 +4173,11 @@ kbd {
   color: #b91c1c;
 }
 
-/* Pinned Modal Footer */
+/* ==========================================================================
+   Fixed Bottom Action Area (Never overlaps scrollable content)
+   ========================================================================== */
 .price-selector-footer {
-  padding: 14px 20px;
+  padding: 12px 16px;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
   display: flex;
@@ -4116,11 +4185,13 @@ kbd {
   justify-content: space-between;
   gap: 12px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .price-selector-footer-total {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .live-total-label {
@@ -4129,29 +4200,32 @@ kbd {
   letter-spacing: 0.05em;
   font-weight: 600;
   color: #64748b;
+  line-height: 1;
 }
 
 .live-total-amount {
   font-size: 1.25rem;
   font-weight: 800;
   color: #065f46;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .live-total-pieces {
   font-size: 0.75rem;
   color: #64748b;
   font-weight: 500;
+  line-height: 1;
 }
 
 .price-selector-footer-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .btn-modal-cancel {
-  padding: 10px 14px;
+  padding: 8px 14px;
   background: transparent;
   border: 1.5px solid #cbd5e1;
   border-radius: 8px;
@@ -4159,7 +4233,9 @@ kbd {
   font-size: 0.88rem;
   color: #475569;
   cursor: pointer;
-  min-height: 42px;
+  min-height: 44px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
 }
 
 .btn-modal-cancel:hover {
@@ -4168,17 +4244,19 @@ kbd {
 }
 
 .btn-modal-confirm {
-  padding: 10px 18px;
+  padding: 8px 16px;
   border: none;
   border-radius: 8px;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: #ffffff;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 42px;
+  min-height: 44px;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
@@ -4200,18 +4278,27 @@ kbd {
   background: #b45309;
 }
 
-/* Mobile Bottom-Sheet Docking (<= 640px) */
+/* ==========================================================================
+   Mobile Bottom-Sheet Docking (<= 640px)
+   ========================================================================== */
 @media (max-width: 640px) {
   .price-selector-overlay {
-    padding: 0;
-    align-items: flex-end;
+    padding: 0 !important;
+    align-items: flex-end !important;
   }
 
+  .modal-dialog.price-selector-modal,
   .price-selector-modal {
-    max-width: 100%;
-    border-radius: 20px 20px 0 0;
-    max-height: 88dvh;
-    animation: slideUpBottomSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 85vh !important;
+    max-height: 85dvh !important;
+    height: auto !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    animation: slideUpBottomSheet 0.26s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2) !important;
+    border: none !important;
   }
 
   @keyframes slideUpBottomSheet {
@@ -4220,31 +4307,44 @@ kbd {
   }
 
   .price-selector-header {
-    padding: 14px 16px;
+    padding: 10px 14px;
+  }
+
+  .price-selector-thumb {
+    width: 64px;
+    height: 76px;
+    min-width: 64px;
+    max-width: 64px;
+    min-height: 76px;
+    max-height: 76px;
+  }
+
+  .price-selector-title {
+    font-size: 1rem;
+  }
+
+  .price-selector-base-hint {
+    font-size: 0.8rem;
   }
 
   .price-selector-body {
-    padding: 14px 16px;
-    gap: 14px;
+    padding: 12px 14px;
+    gap: 12px;
   }
 
   .price-selector-footer {
-    padding: 12px 16px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding: 10px 14px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
   }
 
-  .qty-step-btn {
-    width: 48px;
-    height: 48px;
-  }
-
-  .qty-stepper-box,
-  .custom-price-input {
-    height: 48px;
+  .btn-modal-cancel {
+    padding: 8px 12px;
+    font-size: 0.85rem;
   }
 
   .btn-modal-confirm {
-    padding: 10px 14px;
-    font-size: 0.9rem;
+    padding: 8px 14px;
+    font-size: 0.88rem;
   }
 }
+

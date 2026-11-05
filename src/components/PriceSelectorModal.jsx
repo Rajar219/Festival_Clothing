@@ -147,12 +147,19 @@ export function PriceSelectorModal({
           <div className="price-selector-prod-info">
             <div className="price-selector-thumb">
               {product.image ? (
-                <img src={product.image} alt={product.name} />
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/products/shirt.jpg';
+                  }}
+                />
               ) : (
                 <Tag size={20} color="#059669" />
               )}
             </div>
-            <div>
+            <div className="price-selector-prod-text">
               <h3 id="price-selector-title" className="price-selector-title">
                 {product.name}
               </h3>
@@ -163,7 +170,7 @@ export function PriceSelectorModal({
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="modal-close-btn price-selector-close-btn"
             onClick={onClose}
             aria-label="Close price selection dialog"
           >

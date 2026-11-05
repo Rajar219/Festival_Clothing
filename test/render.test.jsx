@@ -3,6 +3,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import App from '../src/App';
 import { POSProvider } from '../src/context/POSContext';
+import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
 import fs from 'fs';
 import path from 'path';
 
@@ -77,5 +78,83 @@ describe('App Render & Responsive Design Test', () => {
       </POSProvider>
     );
     expect(html).toContain('FESTIVAL CLOTHING');
+  });
+
+  it('verifies PriceSelectorModal renders compact thumbnail, product title, stepper, and pinned footer', () => {
+    const sampleProduct = {
+      id: 'prod_shirts',
+      name: 'Shirts',
+      defaultPrice: 600,
+      offerPrice: 550,
+      offers: [550, 500],
+      image: '/products/shirt.jpg',
+    };
+
+    const modalHtml = renderToString(
+      <PriceSelectorModal
+        isOpen={true}
+        product={sampleProduct}
+        onClose={() => {}}
+        onConfirmPrice={() => {}}
+      />
+    );
+
+    // 1. Thumbnail & Header
+    expect(modalHtml).toContain('price-selector-thumb');
+    expect(modalHtml).toContain('/products/shirt.jpg');
+    expect(modalHtml).toContain('Shirts');
+    expect(modalHtml).toContain('Catalogue Base:');
+    expect(modalHtml).toContain('600');
+
+    // 2. Offer pills & quick reductions
+    expect(modalHtml).toContain('price-pill-row');
+    expect(modalHtml).toContain('600');
+    expect(modalHtml).toContain('550');
+    expect(modalHtml).toContain('500');
+    expect(modalHtml).toContain('10');
+    expect(modalHtml).toContain('Reset');
+
+    // 3. Stepper controls & input
+    expect(modalHtml).toContain('qty-stepper-box');
+    expect(modalHtml).toContain('qty-step-btn minus');
+    expect(modalHtml).toContain('qty-step-btn plus');
+    expect(modalHtml).toContain('custom-price-input');
+
+    // 4. Pinned footer with live subtotal & actions
+    expect(modalHtml).toContain('price-selector-footer');
+    expect(modalHtml).toContain('live-total-amount');
+    expect(modalHtml).toContain('btn-modal-cancel');
+    expect(modalHtml).toContain('btn-modal-confirm');
+  });
+
+  it('verifies index.css strictly implements compact thumbnail, flex-column, and non-overlapping footer architecture', () => {
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Viewport and flex-column constraints
+    expect(cssContent).toContain('.modal-dialog.price-selector-modal');
+    expect(cssContent).toContain('max-height: 85dvh');
+    expect(cssContent).toContain('flex-direction: column');
+    expect(cssContent).toContain('overflow: hidden');
+
+    // Thumbnail size constraint & object-fit: contain (no screen blowing)
+    expect(cssContent).toContain('.price-selector-thumb');
+    expect(cssContent).toContain('object-fit: contain');
+    expect(cssContent).toContain('max-width: 70px');
+    expect(cssContent).toContain('max-height: 82px');
+
+    // Scrollable body with flex: 1 and min-height: 0
+    expect(cssContent).toContain('.price-selector-body');
+    expect(cssContent).toContain('overflow-y: auto');
+    expect(cssContent).toContain('min-height: 0');
+
+    // Pinned footer never overlapping content
+    expect(cssContent).toContain('.price-selector-footer');
+    expect(cssContent).toContain('flex-shrink: 0');
+    expect(cssContent).toContain('env(safe-area-inset-bottom)');
+
+    // Mobile bottom sheet docking
+    expect(cssContent).toContain('align-items: flex-end');
+    expect(cssContent).toContain('border-radius: 20px 20px 0 0');
   });
 });
