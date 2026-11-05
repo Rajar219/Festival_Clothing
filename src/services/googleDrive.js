@@ -10,7 +10,10 @@
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_STORAGE_KEY = 'wisdo_gdrive_auth_v1';
-const FOLDER_CACHE_KEY = 'wisdo_gdrive_folders_v1';
+const FOLDER_CACHE_KEY = 'wisdo_gdrive_folders_v2';
+
+// Primary Root Folder in Google Drive (User designated: 'FESTIVAL SALES BILL')
+export const ROOT_DRIVE_FOLDER_NAME = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER || 'FESTIVAL SALES BILL';
 
 // Default / fallback Google Client ID (can be overridden in settings or .env)
 const DEFAULT_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -232,26 +235,28 @@ async function getOrCreateFolder(folderName, parentFolderId = null, token = null
 
 /**
  * Creates or identifies the required folder structure in Google Drive:
- * FESTIVAL CLOTHING POS/
+ * FESTIVAL SALES BILL/
  *   PC BILLING/
  *   MOBILE BILLING/
  *   DAILY BACKUPS/
  *   SALES REPORTS/
  */
-export async function ensureFolderStructure(tokenOverride = null) {
+export async function ensureFolderStructure(tokenOverride = null, customRootName = null) {
+  const targetRoot = customRootName || ROOT_DRIVE_FOLDER_NAME;
+
   // Check cached folder IDs in localStorage
   try {
     const cached = localStorage.getItem(FOLDER_CACHE_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed.root && parsed.pc && parsed.mobile && parsed.backups && parsed.reports) {
+      if (parsed.rootName === targetRoot && parsed.root && parsed.pc && parsed.mobile && parsed.backups && parsed.reports) {
         return parsed;
       }
     }
   } catch (e) {}
 
-  // 1. Root folder: 'FESTIVAL CLOTHING POS'
-  const rootId = await getOrCreateFolder('FESTIVAL CLOTHING POS', null, tokenOverride);
+  // 1. Root folder: Finds existing 'FESTIVAL SALES BILL' or creates if missing
+  const rootId = await getOrCreateFolder(targetRoot, null, tokenOverride);
 
   // 2. Subfolders
   const [pcId, mobileId, backupsId, reportsId] = await Promise.all([
@@ -262,6 +267,7 @@ export async function ensureFolderStructure(tokenOverride = null) {
   ]);
 
   const folderMap = {
+    rootName: targetRoot,
     root: rootId,
     pc: pcId,
     mobile: mobileId,

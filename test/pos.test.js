@@ -534,11 +534,11 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
 
   // Test: Google Drive Folder Structure & Terminal Designation
   it('Google Drive & Terminal: Verifies folder naming hierarchy and PC/Mobile device separation', () => {
-    const rootFolder = 'FESTIVAL CLOTHING POS';
+    const rootFolder = 'FESTIVAL SALES BILL';
     const subfolders = ['PC BILLING', 'MOBILE BILLING', 'DAILY BACKUPS', 'SALES REPORTS'];
 
     // Expected folder structure check
-    expect(rootFolder).toBe('FESTIVAL CLOTHING POS');
+    expect(rootFolder).toBe('FESTIVAL SALES BILL');
     expect(subfolders).toContain('PC BILLING');
     expect(subfolders).toContain('MOBILE BILLING');
     expect(subfolders).toContain('DAILY BACKUPS');

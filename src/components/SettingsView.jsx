@@ -253,7 +253,7 @@ export function SettingsView() {
                   <Laptop size={16} /> PC Terminal (Main Cash Counter)
                 </strong>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Invoices save locally on this PC and upload to Google Drive under <code>FESTIVAL CLOTHING POS / PC BILLING</code>.
+                  Invoices save locally on this PC and upload to Google Drive under <code>FESTIVAL SALES BILL / PC BILLING</code>.
                 </p>
               </div>
             </label>
@@ -283,7 +283,7 @@ export function SettingsView() {
                   <Smartphone size={16} /> Mobile Terminal (Sales Floor Handheld)
                 </strong>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Invoices save locally on this phone/tablet and upload to Google Drive under <code>FESTIVAL CLOTHING POS / MOBILE BILLING</code>.
+                  Invoices save locally on this phone/tablet and upload to Google Drive under <code>FESTIVAL SALES BILL / MOBILE BILLING</code>.
                 </p>
               </div>
             </label>
@@ -317,7 +317,7 @@ export function SettingsView() {
           </p>
 
           <pre style={{ background: '#0f172a', color: '#38bdf8', padding: '10px 14px', borderRadius: '6px', fontSize: '0.78rem', marginBottom: '16px' }}>
-            {`FESTIVAL CLOTHING POS/
+            {`FESTIVAL SALES BILL/
   ├── PC BILLING/        (Invoices generated on shop computer)
   ├── MOBILE BILLING/    (Invoices generated on mobile devices)
   ├── DAILY BACKUPS/     (Daily full JSON database snapshots)

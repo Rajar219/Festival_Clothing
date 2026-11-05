@@ -256,7 +256,7 @@ export function SuccessModal() {
                     justifyContent: 'center',
                     gap: '6px',
                   }}
-                  title={isDriveConnected ? `Upload PDF into FESTIVAL CLOTHING POS / ${targetFolder} BILLING` : 'Google Drive is not connected. Connect in Settings.'}
+                  title={isDriveConnected ? `Upload PDF into FESTIVAL SALES BILL / ${targetFolder} BILLING` : 'Google Drive is not connected. Connect in Settings.'}
                 >
                   <Cloud size={15} className={isSavingDrive ? 'spin' : ''} />
                   <span>
