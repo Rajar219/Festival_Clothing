@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { usePOS } from '../context/POSContext';
 import { Tag, Search, X, Sparkles, SlidersHorizontal, Package, Check } from 'lucide-react';
 import { PriceSelectorModal } from './PriceSelectorModal';
@@ -21,6 +21,18 @@ export function QuickProductSelector() {
   const { products, addProductToBill, addProductWithPrice } = usePOS();
   const [searchQuery, setSearchQuery] = useState('');
   const [pricingModalProduct, setPricingModalProduct] = useState(null);
+
+  // Auto-open modal if URL query param ?open=... is present
+  useEffect(() => {
+    if (typeof window !== 'undefined' && products.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const autoOpen = params.get('open');
+      if (autoOpen) {
+        const target = products.find((p) => p.id === autoOpen || p.name.toLowerCase() === autoOpen.toLowerCase());
+        if (target) setPricingModalProduct(target);
+      }
+    }
+  }, [products]);
 
   // Strictly active menswear products (excluding any custom item)
   const filteredProducts = useMemo(() => {
