@@ -220,7 +220,7 @@ export const DEFAULT_SETTINGS = {
   upiId: 'festivalclothing@okhdfcbank',
   autoPrintOnCheckout: false,
   deviceType: 'PC', // 'PC' or 'MOBILE' (Admin registered terminal designation)
-  googleClientId: '', // Optional Google OAuth Client ID override
+  googleClientId: '1016904752396-hml53gmsol15v9rh6jes43sugq2n684p.apps.googleusercontent.com', // Google OAuth Client ID
   // Item-level reduction configuration
   allowItemReductions: true, // Store-wide toggle for item reductions
   reductionStepAmount: 10, // Amount in ₹ reduced per step (default ₹10)
