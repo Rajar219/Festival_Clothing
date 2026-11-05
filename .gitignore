@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic / testing
+coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Production build outputs
+dist/
+dist-ssr/
+*.local
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# Environment variables
+.env
+.env.production
+.env.local
+.env.*.local
+!.env.example
+
+# Vercel
+.vercel

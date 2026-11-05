@@ -1,0 +1,43 @@
+{
+  "name": "FESTIVAL CLOTHING - Menswear POS",
+  "short_name": "Festival POS",
+  "description": "Production Menswear Retail Point of Sale & Billing System Powered by WISDO TECH",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#064e3b",
+  "theme_color": "#064e3b",
+  "orientation": "any",
+  "categories": ["business", "finance", "shopping", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Bill",
+      "short_name": "New Bill",
+      "description": "Start a new retail bill",
+      "url": "/?view=billing",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sales History",
+      "short_name": "History",
+      "description": "View today's sales and reports",
+      "url": "/?view=history",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
