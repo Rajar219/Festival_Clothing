@@ -31,6 +31,7 @@ import {
   Laptop,
   Smartphone,
   ExternalLink,
+  Percent,
 } from 'lucide-react';
 
 export function SettingsView() {

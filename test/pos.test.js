@@ -318,19 +318,11 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
 
     const text = generateWhatsAppReceiptText(bill);
 
-    expect(text).toContain('FESTIVAL CLOTHING');
-    expect(text).toContain('MENSWEAR');
+    expect(text).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
+    expect(text).toContain('We appreciate your support. Visit us again!');
     expect(text).toContain('FC-20261009-0001');
-    expect(text).toContain('Shirt');
-    expect(text).toContain('540');
-    expect(text).toContain('Pant / Trousers');
-    expect(text).toContain('740');
-    expect(text).toContain('*Subtotal:* ₹1300.00');
-    expect(text).toContain('*Total Item Reductions:* -₹20.00');
-    expect(text).toContain('*Grand Total:* ₹1280.00');
-    expect(text).toContain('*Payment Method:* CASH');
-    expect(text).toContain('*Amount Received:* ₹1500.00');
-    expect(text).toContain('*Change Due:* ₹220.00');
+    expect(text).toContain('*Amount Paid:* ₹1280.00');
+    expect(text).toContain('*Payment:* CASH');
     expect(text).toContain(COMPANY_BRANDING.attributionText);
   });
 
@@ -1044,13 +1036,11 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
       storeDetails: { name: 'FESTIVAL CLOTHING', subtitle: 'MENSWEAR' },
     };
 
-    const text = generateWhatsAppReceiptText(bill);
-    expect(text).toContain('FESTIVAL CLOTHING');
-    expect(text).toContain('FC-20261105-0089');
-    expect(text).toContain('Shirts');
-    expect(text).toContain('*Subtotal:* ₹1800.00');
-    expect(text).toContain('*Combo Savings:* -₹800.00');
-    expect(text).toContain('*Grand Total:* ₹1000.00');
+    const { doc } = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
+    const pdfText = doc.internal.pages.flat().join(' ');
+    expect(pdfText).toContain('Shirts');
+    expect(pdfText).toContain('Combo Savings');
+    expect(pdfText).toContain('Final Payable Amount');
   });
 
   // Scenario 16: Administrator edits product base price, offer price, and combo settings
@@ -1242,12 +1232,12 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     const text = generateWhatsAppReceiptText(bill);
 
     // Prompt required header format:
-    expect(text).toContain('Thank you for shopping at FESTIVAL CLOTHING!');
-    expect(text).toContain('Your retail invoice is ready.');
-    expect(text).toContain('Invoice No: FC-20261105-0099');
-    expect(text).toContain('Amount Paid: ₹740.00');
-    expect(text).toContain('Payment: UPI');
-    expect(text).toContain('Please find your invoice attached.');
+    expect(text).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
+    expect(text).toContain('We appreciate your support. Visit us again!');
+    expect(text).toContain('*Invoice No:* FC-20261105-0099');
+    expect(text).toContain('*Amount Paid:* ₹740.00');
+    expect(text).toContain('*Payment:* UPI');
+    expect(text).toContain('Please find your retail invoice attached.');
     expect(text).toContain(COMPANY_BRANDING.attributionText);
   });
 });

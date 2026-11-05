@@ -213,8 +213,8 @@ export const INITIAL_PRODUCTS = [
 export const DEFAULT_SETTINGS = {
   shopName: 'FESTIVAL CLOTHING',
   subtitle: 'MENSWEAR',
-  address: 'Shop No. 14, Main Bazaar, Near Clock Tower, City Cloth Market',
-  phone: '+91 98400 12345',
+  address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
+  phone: '',
   receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill in original condition.',
   defaultPrintMode: 'thermal', // 'thermal' or 'a4'
   upiId: 'festivalclothing@okhdfcbank',
@@ -364,6 +364,12 @@ export async function seedInitialDataIfEmpty() {
       attributionText: COMPANY_BRANDING.attributionText,
     };
     delete merged.gstin; // Strictly remove GST registration from local storage
+    if (merged.address?.includes('Main Bazaar') || !merged.address) {
+      merged.address = DEFAULT_SETTINGS.address;
+    }
+    if (merged.phone === '+91 98400 12345') {
+      merged.phone = '';
+    }
     await db.put('settings', {
       key: 'shop_config',
       value: merged,

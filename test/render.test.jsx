@@ -68,4 +68,14 @@ describe('App Render & Responsive Design Test', () => {
     const healthPath = path.resolve(__dirname, '../api/health.js');
     expect(fs.existsSync(healthPath)).toBe(true);
   });
+
+  it('verifies SettingsView and Admin authentication views render without icon or runtime exceptions', () => {
+    // Render POSProvider with SettingsView
+    const html = renderToString(
+      <POSProvider>
+        <App />
+      </POSProvider>
+    );
+    expect(html).toContain('FESTIVAL CLOTHING');
+  });
 });

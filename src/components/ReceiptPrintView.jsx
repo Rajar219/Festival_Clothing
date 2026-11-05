@@ -8,9 +8,9 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
   const store = bill.storeDetails || {
     name: 'FESTIVAL CLOTHING',
     subtitle: 'MENSWEAR',
-    address: 'Shop No. 14, Main Bazaar, City Cloth Market',
-    phone: '+91 98400 12345',
-    receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill.',
+    address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
+    phone: '',
+    receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill in original condition.',
     attributionText: COMPANY_BRANDING.attributionText,
     companyName: COMPANY_BRANDING.companyName,
   };
@@ -25,7 +25,8 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
           <h1 className="receipt-store-name">{store.name}</h1>
           <h2 className="receipt-subtitle">{store.subtitle}</h2>
           <div className="receipt-address">{store.address}</div>
-          <div className="receipt-phone">Ph: {store.phone}</div>
+          {store.phone && <div className="receipt-phone">Ph: {store.phone}</div>}
+          <div className="receipt-badge-title">RETAIL INVOICE</div>
         </div>
 
         <div className="receipt-divider-dashed" />
@@ -188,10 +189,10 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
           <h2 className="a4-store-sub">{store.subtitle}</h2>
           <div className="a4-brand-subnote">{COMPANY_BRANDING.attributionText}</div>
           <p className="a4-store-addr">{store.address}</p>
-          <p className="a4-store-contact">Phone: {store.phone}</p>
+          {store.phone && <p className="a4-store-contact">Phone: {store.phone}</p>}
         </div>
         <div className="a4-header-right">
-          <div className="invoice-title-chip">RETAIL INVOICE / SALES RECEIPT</div>
+          <div className="invoice-title-chip">RETAIL INVOICE</div>
           <div className="a4-meta-row">
             <span>Invoice No:</span>
             <strong>{bill.billNumber}</strong>
@@ -226,12 +227,12 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
         </div>
       )}
 
-      {/* 6-Column Itemized Product Table: | S.No | Product Description | Qty | Original Price | Discount | Final Amount | */}
+      {/* 6-Column Itemized Product Table: | S.No | Product | Qty | Original Price | Discount | Final Amount | */}
       <table className="a4-items-table">
         <thead>
           <tr>
             <th style={{ width: '45px' }} className="text-center">S.No</th>
-            <th>Product Description</th>
+            <th>Product</th>
             <th style={{ width: '65px' }} className="text-center">Qty</th>
             <th style={{ width: '110px' }} className="text-right">Original Price</th>
             <th style={{ width: '110px' }} className="text-right">Discount</th>
@@ -285,7 +286,7 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
           </div>
           {bill.totalReduction > 0 && (
             <div className="a4-row disc">
-              <span>Individual Product Discounts:</span>
+              <span>Item-wise Discounts:</span>
               <span>-₹{(bill.totalReduction || 0).toFixed(2)}</span>
             </div>
           )}
@@ -335,12 +336,12 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       </div>
 
       <div className="a4-footer-thanks">
-        <p className="a4-thanks-main">Thank you for shopping with FESTIVAL CLOTHING!</p>
-        <p className="a4-thanks-sub">We appreciate your purchase.</p>
+        <p className="a4-thanks-main">Thanks for purchasing from FESTIVAL CLOTHING!</p>
+        <p className="a4-thanks-sub">We appreciate your support. Visit us again!</p>
       </div>
 
       <div className="a4-company-attribution">
-        <strong>FESTIVAL CLOTHING — MENSWEAR</strong> • <span>{COMPANY_BRANDING.attributionText} / wisdotech.in</span>
+        <strong>FESTIVAL CLOTHING - MENSWEAR</strong> • <span>{COMPANY_BRANDING.attributionText} / wisdotech.in</span>
       </div>
     </div>
   );
