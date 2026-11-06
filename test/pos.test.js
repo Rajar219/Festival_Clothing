@@ -1240,4 +1240,80 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(text).toContain('Please find your retail invoice attached.');
     expect(text).toContain(COMPANY_BRANDING.attributionText);
   });
+
+  // Requirement 21: Thermal print generates in A4 size with authentic monospace layout for customer sharing
+  it('Requirement 21: Thermal print generates in A4 size with authentic monospace layout for customer sharing', () => {
+    const bill = {
+      id: 'bill_thermal_a4',
+      billNumber: 'FC-20261106-0001',
+      createdAt: '2026-11-06T10:30:00.000Z',
+      cashierName: 'Cashier 1',
+      items: [
+        {
+          id: 'item_1',
+          name: 'Shirts',
+          originalUnitPrice: 600,
+          finalUnitPrice: 550,
+          reductionPerUnit: 50,
+          qty: 2,
+          lineTotal: 1100,
+        },
+        {
+          id: 'item_2',
+          name: '3 Shirts Combo',
+          isCombo: true,
+          piecesPerUnit: 3,
+          originalCombinedValue: 1800,
+          comboSavingsPerUnit: 800,
+          finalUnitPrice: 1000,
+          qty: 1,
+          lineTotal: 1000,
+        },
+      ],
+      subtotal: 2900,
+      totalReduction: 100,
+      comboSavings: 800,
+      finalPayableAmount: 2100,
+      paymentMethod: 'cash',
+      tenderAmount: 2500,
+      changeDue: 400,
+    };
+
+    const { doc, fileName, blob } = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
+
+    // Verify A4 page dimensions (210mm x 297mm)
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    expect(Math.round(pageWidth)).toBe(210);
+    expect(Math.round(pageHeight)).toBe(297);
+
+    // Verify file name and valid blob size
+    expect(fileName).toBe('FC-20261106-0001_Invoice.pdf');
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(0);
+
+    const pdfText = doc.internal.pages.flat().join(' ');
+    // Header & Meta
+    expect(pdfText).toContain('FESTIVAL CLOTHING');
+    expect(pdfText).toContain('MENSWEAR');
+    expect(pdfText).toContain('RETAIL INVOICE / SALES RECEIPT');
+    expect(pdfText).toContain('Bill No: FC-20261106-0001');
+
+    // Items table
+    expect(pdfText).toContain('Item Description');
+    expect(pdfText).toContain('Shirts');
+    expect(pdfText).toContain('3 Shirts Combo');
+
+    // Totals
+    expect(pdfText).toContain('Subtotal:');
+    expect(pdfText).toContain('Item Reductions:');
+    expect(pdfText).toContain('Combo Savings:');
+    expect(pdfText).toContain('FINAL PAYABLE:');
+    expect(pdfText).toContain('Rs. 2100.00');
+
+    // Footer
+    expect(pdfText).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
+    expect(pdfText).toContain('We appreciate your support. Visit us again!');
+    expect(pdfText).toContain(COMPANY_BRANDING.attributionText);
+  });
 });

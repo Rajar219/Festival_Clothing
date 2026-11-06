@@ -95,153 +95,223 @@ export function generateReceiptPDF(bill, options = {}) {
   };
 
   if (mode === 'thermal') {
-    // 80mm thermal receipt format (80mm width, dynamic height)
-    const itemCount = bill.items?.length || 1;
-    const estimatedHeight = Math.max(160, 110 + itemCount * 12);
+    // =========================================================================
+    // Thermal Receipt Format Scaled and Formatted in A4 Size (210mm x 297mm)
+    // Clean monospace typography, dashed dividers, and ~60-70% page utilization
+    // =========================================================================
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [80, estimatedHeight],
+      format: 'a4',
     });
 
-    let y = 10;
+    const marginLeft = 20;
+    const marginRight = 190;
+    const pageCenter = 105;
+
+    let y = 18;
     doc.setFont('courier', 'bold');
-    doc.setFontSize(13);
-    doc.text(store.name, 40, y, { align: 'center' });
-    y += 5;
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text(store.name, pageCenter, y, { align: 'center' });
+    y += 6;
+
+    doc.setFontSize(12);
+    doc.setFont('courier', 'bold');
+    doc.text(store.subtitle, pageCenter, y, { align: 'center' });
+    y += 5.5;
 
     doc.setFontSize(9.5);
     doc.setFont('courier', 'normal');
-    doc.text(store.subtitle, 40, y, { align: 'center' });
-    y += 4.5;
-
-    doc.setFontSize(7.5);
-    doc.text(store.address, 40, y, { align: 'center', maxWidth: 70 });
-    y += 8;
+    doc.text(store.address, pageCenter, y, { align: 'center', maxWidth: 150 });
+    y += 8.5;
 
     if (store.phone) {
-      doc.text(`Ph: ${store.phone}`, 40, y, { align: 'center' });
-      y += 4.5;
+      doc.text(`Phone: ${store.phone}`, pageCenter, y, { align: 'center' });
+      y += 5;
     }
 
     doc.setFont('courier', 'bold');
-    doc.setFontSize(9);
-    doc.text('RETAIL INVOICE', 40, y, { align: 'center' });
-    y += 4.5;
-
-    doc.setLineDashPattern([1, 1], 0);
-    doc.line(5, y, 75, y);
+    doc.setFontSize(11);
+    doc.text('RETAIL INVOICE / SALES RECEIPT', pageCenter, y, { align: 'center' });
     y += 5;
 
-    // Bill Meta
-    doc.setFontSize(8);
-    doc.setFont('courier', 'normal');
-    doc.text(`Bill No: ${bill.billNumber}`, 5, y);
-    y += 4;
-    doc.text(`Date: ${formatDateTime(bill.createdAt)}`, 5, y);
-    y += 4;
-    doc.text(`Cashier: ${bill.cashierName || 'Cashier'}`, 5, y);
-    if (bill.customerName) {
-      y += 4;
-      doc.text(`Cust: ${bill.customerName.substring(0, 20)}`, 5, y);
-    }
-    y += 4.5;
+    doc.setLineDashPattern([2, 1.5], 0);
+    doc.setLineWidth(0.35);
+    doc.line(marginLeft, y, marginRight, y);
+    y += 6;
 
-    doc.line(5, y, 75, y);
-    y += 4.5;
+    // Bill Meta
+    doc.setFontSize(9.5);
+    doc.setFont('courier', 'normal');
+    doc.text(`Bill No: ${bill.billNumber}`, marginLeft, y);
+    doc.text(`Date & Time: ${formatDateTime(bill.createdAt)}`, marginRight, y, { align: 'right' });
+    y += 5;
+
+    doc.text(`Cashier: ${bill.cashierName || 'Cashier'}`, marginLeft, y);
+    const statusText = bill.status === 'cancelled' ? 'STATUS: CANCELLED' : 'STATUS: PAID';
+    doc.setFont('courier', 'bold');
+    doc.text(statusText, marginRight, y, { align: 'right' });
+    doc.setFont('courier', 'normal');
+
+    if (bill.customerName) {
+      y += 5;
+      const custInfo = bill.customerPhone ? `${bill.customerName} (${bill.customerPhone})` : bill.customerName;
+      doc.text(`Customer: ${custInfo}`, marginLeft, y);
+    }
+    y += 5.5;
+
+    doc.line(marginLeft, y, marginRight, y);
+    y += 5.5;
 
     // Items table header
-    doc.setFont('courier', 'bold');
-    doc.text('Item', 5, y);
-    doc.text('Qty', 38, y);
-    doc.text('Rate', 48, y);
-    doc.text('Total', 75, y, { align: 'right' });
-    y += 3.5;
-    doc.line(5, y, 75, y);
-    y += 4;
+    const colSNo = marginLeft;
+    const colItem = marginLeft + 14;
+    const colQty = marginLeft + 98;
+    const colRate = marginLeft + 132;
+    const colTotal = marginRight;
 
-    // Items
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(10);
+    doc.text('S.No', colSNo, y);
+    doc.text('Item Description', colItem, y);
+    doc.text('Qty', colQty, y, { align: 'center' });
+    doc.text('Rate', colRate, y, { align: 'right' });
+    doc.text('Total', colTotal, y, { align: 'right' });
+    y += 3.5;
+    doc.line(marginLeft, y, marginRight, y);
+    y += 5.5;
+
+    // Items list
     doc.setFont('courier', 'normal');
-    (bill.items || []).forEach((item) => {
+    doc.setFontSize(9.5);
+
+    (bill.items || []).forEach((item, index) => {
       const finalPrice = item.finalUnitPrice ?? item.unitPrice;
       const red = item.reductionPerUnit || 0;
-      const name = item.name.length > 17 ? item.name.substring(0, 15) + '..' : item.name;
-      
-      doc.text(name, 5, y);
-      doc.text(String(item.qty), 40, y);
-      doc.text(String(finalPrice), 48, y);
-      doc.text(item.lineTotal.toFixed(2), 75, y, { align: 'right' });
-      y += 4;
+      const isCombo = Boolean(item.isCombo || item.productId?.includes('combo'));
+      const origPrice = isCombo
+        ? (item.originalCombinedValue ?? ((item.regularPricePerUnit || 600) * (item.piecesPerUnit || 3)))
+        : (item.originalUnitPrice ?? item.unitPrice);
+      const displayName = isCombo ? `${item.name} (${item.piecesPerUnit || 3} Pcs)` : item.name;
 
-      if (item.isCombo) {
-        doc.setFontSize(6.5);
-        const pcs = (item.piecesPerUnit || 3) * item.qty;
+      doc.text(String(index + 1), colSNo, y);
+      doc.text(displayName, colItem, y);
+      doc.text(String(item.qty), colQty, y, { align: 'center' });
+      doc.text(`Rs. ${finalPrice.toFixed(2)}`, colRate, y, { align: 'right' });
+      doc.text(`Rs. ${item.lineTotal.toFixed(2)}`, colTotal, y, { align: 'right' });
+      y += 4.5;
+
+      if (isCombo) {
+        doc.setFontSize(8);
         const savings = item.comboSavingsPerUnit ? (item.comboSavingsPerUnit * item.qty) : (item.comboSavings || 800);
-        doc.text(` (${pcs} Pcs, Combo Savings: Rs.${savings})`, 5, y);
-        doc.setFontSize(8);
-        y += 3.5;
+        doc.text(`  (Orig Combined: Rs. ${(origPrice * item.qty).toFixed(2)}, Combo Savings: -Rs. ${savings.toFixed(2)})`, colItem, y);
+        doc.setFontSize(9.5);
+        y += 4.5;
       } else if (red > 0) {
-        doc.setFontSize(6.5);
-        doc.text(` (Orig: Rs.${item.originalUnitPrice ?? item.unitPrice}, Less Rs.${red}/pc)`, 5, y);
         doc.setFontSize(8);
-        y += 3.5;
+        doc.text(`  (Orig: Rs. ${origPrice.toFixed(2)}, Discount: -Rs. ${red.toFixed(2)}/pc)`, colItem, y);
+        doc.setFontSize(9.5);
+        y += 4.5;
       }
     });
 
-    doc.line(5, y, 75, y);
-    y += 4.5;
+    doc.line(marginLeft, y, marginRight, y);
+    y += 5.5;
 
-    // Totals
-    doc.text('Subtotal:', 5, y);
-    doc.text(`Rs. ${(bill.subtotal || 0).toFixed(2)}`, 75, y, { align: 'right' });
-    y += 4.5;
+    // Totals Section
+    const totalsLeft = 112;
+    doc.setFontSize(9.5);
+    doc.setFont('courier', 'normal');
+
+    doc.text('Subtotal:', totalsLeft, y);
+    doc.text(`Rs. ${(bill.subtotal || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
+    y += 5;
 
     if (bill.totalReduction > 0) {
-      doc.text(`Item Reductions:`, 5, y);
-      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, 75, y, { align: 'right' });
-      y += 4.5;
+      doc.text('Item Reductions:', totalsLeft, y);
+      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
+      y += 5;
     }
 
     if (bill.comboSavings > 0) {
-      doc.text(`Combo Savings:`, 5, y);
-      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, 75, y, { align: 'right' });
-      y += 4.5;
+      doc.text('Combo Savings:', totalsLeft, y);
+      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
+      y += 5;
     }
 
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(9.5);
-    doc.text('FINAL PAYABLE:', 5, y);
-    doc.text(`Rs. ${(bill.finalPayableAmount || 0).toFixed(2)}`, 75, y, { align: 'right' });
+    const totalDiscount = (bill.totalReduction || 0) + (bill.comboSavings || 0);
+    if (totalDiscount > 0) {
+      doc.setFont('courier', 'bold');
+      doc.text('Total Discount:', totalsLeft, y);
+      doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, marginRight, y, { align: 'right' });
+      doc.setFont('courier', 'normal');
+      y += 5;
+    }
+
+    y += 2;
+    doc.line(totalsLeft - 4, y, marginRight, y);
     y += 5.5;
 
-    doc.setFontSize(8);
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(12);
+    doc.text('FINAL PAYABLE:', totalsLeft, y);
+    doc.text(`Rs. ${(bill.finalPayableAmount || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
+    y += 6;
+    doc.line(totalsLeft - 4, y, marginRight, y);
+    y += 5.5;
+
+    doc.setFontSize(9.5);
     doc.setFont('courier', 'normal');
-    doc.text(`Payment: ${(bill.paymentMethod || 'cash').toUpperCase()}`, 5, y);
-    y += 4;
-
-    if (bill.paymentMethod === 'cash' && bill.tenderAmount) {
-      doc.text(`Received: Rs. ${Number(bill.tenderAmount).toFixed(2)}`, 5, y);
-      y += 3.5;
-      doc.text(`Change Due: Rs. ${Number(bill.changeDue || 0).toFixed(2)}`, 5, y);
-      y += 4.5;
-    } else {
-      y += 1;
-    }
-
-    doc.line(5, y, 75, y);
+    doc.text(`Payment Mode: ${(bill.paymentMethod || 'cash').toUpperCase()}`, totalsLeft, y);
     y += 4.5;
 
-    // Footer & Attribution
-    doc.setFontSize(7);
-    doc.text('Thanks for purchasing from FESTIVAL CLOTHING!', 40, y, { align: 'center' });
-    y += 3.5;
-    doc.text('We appreciate your support. Visit us again!', 40, y, { align: 'center' });
-    y += 4;
-    doc.text(COMPANY_BRANDING.attributionText, 40, y, { align: 'center' });
-    y += 3.5;
-    doc.text(COMPANY_BRANDING.companyName, 40, y, { align: 'center' });
+    if (bill.paymentMethod === 'cash' && (bill.amountReceived || bill.tenderAmount)) {
+      doc.text(`Cash Received: Rs. ${Number(bill.amountReceived || bill.tenderAmount).toFixed(2)}`, totalsLeft, y);
+      y += 4.5;
+      doc.text(`Change Returned: Rs. ${Number(bill.changeDue || 0).toFixed(2)}`, totalsLeft, y);
+      y += 5;
+    } else if (bill.paymentMethod === 'upi' && bill.upiRef) {
+      doc.text(`UPI Ref: ${bill.upiRef}`, totalsLeft, y);
+      y += 5;
+    }
 
-    const fileName = `${bill.billNumber}_Thermal.pdf`;
+    // Proportional vertical spacing to comfortably utilize 60–70% of A4 page
+    y = Math.max(y + 12, 175);
+
+    doc.line(marginLeft, y, marginRight, y);
+    y += 6;
+
+    // Footer & Customer Thank You
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(11);
+    doc.text('Thanks for purchasing from FESTIVAL CLOTHING!', pageCenter, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(9.5);
+    doc.text('We appreciate your support. Visit us again!', pageCenter, y, { align: 'center' });
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.text('• Goods once sold can be exchanged within 7 days with this bill in original condition.', pageCenter, y, { align: 'center' });
+    y += 5;
+
+    doc.setLineDashPattern([], 0);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(marginLeft, y, marginRight, y);
+    y += 5;
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(9);
+    doc.text('FESTIVAL CLOTHING - MENSWEAR', pageCenter, y, { align: 'center' });
+    y += 4.5;
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8.5);
+    doc.text(`${COMPANY_BRANDING.attributionText} / wisdotech.in`, pageCenter, y, { align: 'center' });
+
+    const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {
       doc.save(fileName);
     }

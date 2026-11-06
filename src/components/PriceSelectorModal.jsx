@@ -22,9 +22,9 @@ export function PriceSelectorModal({
       const initialPrice = item
         ? (item.unitPrice !== undefined ? item.unitPrice : item.originalUnitPrice)
         : (product.offerPrice !== null && product.offerPrice !== undefined && Number(product.offerPrice) >= 0
-            ? Number(product.offerPrice)
-            : Number(product.defaultPrice));
-      
+          ? Number(product.offerPrice)
+          : Number(product.defaultPrice));
+
       const initialQty = item ? Number(item.qty || 1) : 1;
       setSelectedPrice(String(initialPrice));
       setQty(initialQty);

@@ -770,7 +770,7 @@ export function POSProvider({ children }) {
 
       try {
         showToast(`Saving invoice to Google Drive (${folderDisplayName})...`, 'info');
-        const { blob } = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
+        const { blob } = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
         if (!blob) throw new Error('Failed to generate PDF document');
 
         const driveRes = await uploadInvoicePDFToDrive(bill, blob, folderToUse);

@@ -62,10 +62,10 @@ export function SuccessModal() {
 
   if (!isSuccessModalOpen || !lastFinalizedBill) return null;
 
-  const handleDownloadPDF = (mode = 'a4') => {
+  const handleDownloadPDF = (mode = 'thermal') => {
     try {
       generateReceiptPDF(lastFinalizedBill, mode);
-      showToast(`PDF invoice (${mode.toUpperCase()}) downloaded successfully.`, 'success');
+      showToast(`PDF invoice (${mode === 'thermal' ? 'Thermal A4' : 'A4'}) downloaded successfully.`, 'success');
     } catch (err) {
       showToast('Error generating PDF: ' + err.message, 'error');
     }
@@ -319,7 +319,7 @@ export function SuccessModal() {
               <Printer size={18} />
               <div className="action-card-text">
                 <strong>Print Receipt</strong>
-                <small>{settings.defaultPrintMode === 'a4' ? 'A4 Invoice' : 'Thermal 80mm'}</small>
+                <small>{settings.defaultPrintMode === 'a4' ? 'A4 Invoice' : 'Thermal (A4 Size)'}</small>
               </div>
             </button>
 
@@ -328,13 +328,13 @@ export function SuccessModal() {
               type="button"
               id="btn-download-pdf"
               className="action-card-btn tertiary"
-              onClick={() => handleDownloadPDF('a4')}
+              onClick={() => handleDownloadPDF('thermal')}
               style={{ padding: '12px' }}
             >
               <Download size={18} />
               <div className="action-card-text">
                 <strong>Download PDF</strong>
-                <small>A4 Retail Bill</small>
+                <small>Thermal A4 Bill</small>
               </div>
             </button>
           </div>

@@ -2018,6 +2018,11 @@ kbd {
 
 /* Printable styles */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -2041,8 +2046,12 @@ kbd {
     display: none !important;
   }
 
-  @page {
-    margin: 0;
+  .printable-receipt.thermal-receipt {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 10px 0 !important;
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
   }
 }
 
@@ -2060,45 +2069,62 @@ kbd {
 
 .thermal-receipt {
   width: 100%;
-  max-width: 320px;
+  max-width: 640px;
   margin: 0 auto;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 24px 20px;
+  box-sizing: border-box;
 }
 
 .receipt-header {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .receipt-store-name {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: -0.5px;
+  margin-bottom: 2px;
 }
 
 .receipt-subtitle {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: 4px;
 }
 
+.receipt-address {
+  font-size: 11.5px;
+  color: #333333;
+  line-height: 1.35;
+}
+
+.receipt-badge-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-top: 6px;
+}
+
 .receipt-divider-dashed {
-  border-top: 1px dashed #000000;
-  margin: 8px 0;
+  border-top: 1.5px dashed #000000;
+  margin: 10px 0;
 }
 
 .receipt-divider-dotted {
   border-top: 1px dotted #555555;
-  margin: 6px 0;
+  margin: 8px 0;
 }
 
 .receipt-meta-grid {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 10px;
+  gap: 3px;
+  font-size: 12px;
 }
 
 .meta-line {
@@ -2109,49 +2135,56 @@ kbd {
 .thermal-items-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 4px 0;
-  font-size: 10px;
+  margin: 6px 0;
+  font-size: 12px;
 }
 
 .thermal-items-table th {
-  border-bottom: 1px dashed #000000;
-  padding: 4px 0;
+  border-bottom: 1.5px dashed #000000;
+  padding: 6px 0;
   text-align: left;
+  font-weight: 800;
 }
 
 .thermal-items-table td {
-  padding: 3px 0;
+  padding: 5px 0;
   vertical-align: top;
 }
 
 .th-sno,
 .td-sno {
-  width: 14px;
+  width: 24px;
 }
 
 .th-qty,
 .td-qty {
-  width: 24px;
+  width: 44px;
   text-align: center;
 }
 
 .th-rate,
 .td-rate {
-  width: 45px;
+  width: 75px;
   text-align: right;
 }
 
 .th-amount,
 .td-amount {
-  width: 55px;
+  width: 85px;
   text-align: right;
+}
+
+.thermal-item-discount-note {
+  font-size: 10.5px;
+  color: #444444;
+  padding: 0 0 4px 0 !important;
 }
 
 .receipt-totals-section {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
+  gap: 4px;
+  font-size: 12.5px;
 }
 
 .total-line {
@@ -2160,33 +2193,47 @@ kbd {
 }
 
 .grand-total-line {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
-  border-top: 1px solid #000;
-  border-bottom: 1px solid #000;
-  padding: 4px 0;
-  margin: 3px 0;
+  border-top: 1.5px solid #000;
+  border-bottom: 1.5px solid #000;
+  padding: 6px 0;
+  margin: 4px 0;
 }
 
 .receipt-footer {
   text-align: center;
-  margin-top: 10px;
-  font-size: 9px;
+  margin-top: 14px;
+  font-size: 10.5px;
 }
 
 .thank-you-msg {
+  font-size: 13px;
   font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.thank-you-submsg {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 4px;
+}
+
+.footer-custom-text {
+  font-size: 10px;
+  color: #555555;
   margin-bottom: 4px;
 }
 
 .wisdo-print-attribution {
   font-weight: 700;
   margin-top: 6px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .wisdo-web-link {
-  font-size: 8.5px;
+  font-size: 10px;
   color: #444;
 }
 

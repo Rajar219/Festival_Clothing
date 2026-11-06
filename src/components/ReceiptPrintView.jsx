@@ -113,8 +113,15 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
 
           {bill.totalReduction > 0 && (
             <div className="total-line discount-line">
-              <span>Total Item Reductions:</span>
+              <span>Item Reductions:</span>
               <span>-₹{(bill.totalReduction || 0).toFixed(2)}</span>
+            </div>
+          )}
+
+          {bill.comboSavings > 0 && (
+            <div className="total-line discount-line">
+              <span>Combo Savings:</span>
+              <span>-₹{(bill.comboSavings || 0).toFixed(2)}</span>
             </div>
           )}
 
@@ -158,10 +165,11 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
 
         <div className="receipt-divider-dashed" />
 
-        {/* Footer with Mandatory Official WISDO TECH Attribution */}
+        {/* Footer with Customer Thank You & Mandatory Official WISDO TECH Attribution */}
         <div className="receipt-footer">
-          <p className="thank-you-msg">*** THANK YOU FOR VISITING! ***</p>
-          <p className="footer-custom-text">{store.receiptFooter}</p>
+          <p className="thank-you-msg">Thanks for purchasing from FESTIVAL CLOTHING!</p>
+          <p className="thank-you-submsg">We appreciate your support. Visit us again!</p>
+          <p className="footer-custom-text">• Goods once sold can be exchanged within 7 days with this bill in original condition.</p>
           <div className="receipt-divider-dotted" />
           <p className="wisdo-print-attribution">{COMPANY_BRANDING.attributionText}</p>
           <p className="wisdo-web-link">{COMPANY_BRANDING.companyName}</p>

@@ -74,11 +74,11 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
 
     const receiptText = generateWhatsAppReceiptText(bill, settings);
 
-    // 1. Generate PDF blob
+    // 1. Generate Thermal A4 PDF blob for customer sharing
     let pdfBlob = null;
     let pdfFileName = `${bill.billNumber}_Invoice.pdf`;
     try {
-      const pdfResult = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
+      const pdfResult = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
       pdfBlob = pdfResult.blob;
       pdfFileName = pdfResult.fileName;
     } catch (err) {
@@ -121,7 +121,7 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
         URL.revokeObjectURL(url);
         setPdfDownloaded(true);
       } else {
-        generateReceiptPDF(bill, { mode: 'a4', autoDownload: true });
+        generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
         setPdfDownloaded(true);
       }
     } catch (err) {
@@ -143,9 +143,9 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
 
   const handleDownloadOnlyPDF = () => {
     try {
-      generateReceiptPDF(bill, { mode: 'a4', autoDownload: true });
+      generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
       setPdfDownloaded(true);
-      showToast('PDF invoice downloaded successfully.', 'success');
+      showToast('Thermal PDF invoice downloaded successfully.', 'success');
     } catch (err) {
       showToast('Failed to generate PDF: ' + err.message, 'error');
     }
