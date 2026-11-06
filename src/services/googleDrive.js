@@ -326,7 +326,7 @@ async function uploadMultipartFile(folderId, fileName, mimeType, fileBlob, token
     name: fileName,
     parents: [folderId],
     mimeType: mimeType,
-    description: 'FESTIVAL CLOTHING MENSWEAR POS — Powered by WISDO TECH',
+    description: 'FESTIVAL CLOTHING MENSWEAR — Retail Sales Invoice',
   };
 
   const reader = new FileReader();

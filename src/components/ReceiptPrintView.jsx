@@ -1,6 +1,5 @@
 import React from 'react';
 import { formatINR, formatDateTime } from '../utils/currency';
-import { COMPANY_BRANDING } from '../services/db';
 
 export function ReceiptPrintView({ bill, mode = 'thermal' }) {
   if (!bill) return null;
@@ -11,8 +10,6 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
     address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
     phone: '',
     receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill in original condition.',
-    attributionText: COMPANY_BRANDING.attributionText,
-    companyName: COMPANY_BRANDING.companyName,
   };
 
   const isThermal = mode === 'thermal';
@@ -165,14 +162,11 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
 
         <div className="receipt-divider-dashed" />
 
-        {/* Footer with Customer Thank You & Mandatory Official WISDO TECH Attribution */}
+        {/* Footer with Customer Thank You */}
         <div className="receipt-footer">
           <p className="thank-you-msg">Thanks for purchasing from FESTIVAL CLOTHING!</p>
           <p className="thank-you-submsg">We appreciate your support. Visit us again!</p>
           <p className="footer-custom-text">• Goods once sold can be exchanged within 7 days with this bill in original condition.</p>
-          <div className="receipt-divider-dotted" />
-          <p className="wisdo-print-attribution">{COMPANY_BRANDING.attributionText}</p>
-          <p className="wisdo-web-link">{COMPANY_BRANDING.companyName}</p>
         </div>
       </div>
     );
@@ -195,7 +189,6 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
         <div className="a4-header-left">
           <h1 className="a4-store-name">{store.name}</h1>
           <h2 className="a4-store-sub">{store.subtitle}</h2>
-          <div className="a4-brand-subnote">{COMPANY_BRANDING.attributionText}</div>
           <p className="a4-store-addr">{store.address}</p>
           {store.phone && <p className="a4-store-contact">Phone: {store.phone}</p>}
         </div>
@@ -349,7 +342,7 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       </div>
 
       <div className="a4-company-attribution">
-        <strong>FESTIVAL CLOTHING - MENSWEAR</strong> • <span>{COMPANY_BRANDING.attributionText} / wisdotech.in</span>
+        <strong>FESTIVAL CLOTHING - MENSWEAR</strong>
       </div>
     </div>
   );

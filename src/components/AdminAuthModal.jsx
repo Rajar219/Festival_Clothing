@@ -6,6 +6,8 @@ import { Shield, Lock, X, CheckCircle2 } from 'lucide-react';
 export function AdminAuthModal() {
   const {
     isAdminAuthModalOpen,
+
+
     setIsAdminAuthModalOpen,
     loginAsAdmin,
     setPendingNavTarget,

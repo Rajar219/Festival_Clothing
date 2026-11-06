@@ -72,6 +72,11 @@ export function POSProvider({ children }) {
   const [lastFinalizedBill, setLastFinalizedBill] = useState(null);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
 
+  // Payment State (Shared between Desktop BillSummary and Mobile CheckoutModal)
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'upi'
+  const [cashReceived, setCashReceived] = useState('');
+  const [upiRef, setUpiRef] = useState('');
+
   // Check Drive connection on mount
   useEffect(() => {
     setIsDriveConnected(isGoogleDriveConnected());
@@ -134,6 +139,28 @@ export function POSProvider({ children }) {
     comboEvaluations,
     appliedCombos,
   } = billCalculations;
+
+  // Sync cashReceived whenever finalPayableAmount changes
+  useEffect(() => {
+    if (finalPayableAmount > 0) {
+      setCashReceived((prev) => {
+        if (!prev || prev === '0') return finalPayableAmount.toString();
+        return prev;
+      });
+    } else {
+      setCashReceived('');
+    }
+  }, [finalPayableAmount]);
+
+  // Derived change due calculation for cash payments
+  const cashChangeDue = useMemo(() => {
+    if (paymentMethod !== 'cash') return 0;
+    const received = parseFloat(cashReceived) || 0;
+    const recPaise = rupeesToPaise(received);
+    const payablePaise = rupeesToPaise(finalPayableAmount);
+    const diffPaise = recPaise - payablePaise;
+    return paiseToRupees(Math.max(0, diffPaise));
+  }, [paymentMethod, cashReceived, finalPayableAmount]);
 
   // Toggle combo application
   const toggleCombo = useCallback((comboId, forcedState) => {
@@ -440,6 +467,9 @@ export function POSProvider({ children }) {
     setItems([]);
     setCustomerName('');
     setCustomerPhone('');
+    setPaymentMethod('cash');
+    setCashReceived('');
+    setUpiRef('');
     setIsCheckoutModalOpen(false);
     setIsSuccessModalOpen(false);
     setIsPrintPreviewOpen(false);
@@ -459,7 +489,7 @@ export function POSProvider({ children }) {
 
   // Finalize Checkout (Cash or UPI)
   const finalizeCheckout = useCallback(
-    async (paymentDetails) => {
+    async (paymentDetails = {}) => {
       if (isSubmittingRef.current) {
         console.warn('Checkout submission locked to prevent duplicate bill creation.');
         return false;
@@ -469,6 +499,22 @@ export function POSProvider({ children }) {
         showToast('Cannot finalize an empty bill.', 'error');
         return false;
       }
+
+      const method = paymentDetails.method || paymentMethod || 'cash';
+      const rawReceived = paymentDetails.amountReceived !== undefined
+        ? Number(paymentDetails.amountReceived)
+        : (method === 'cash' ? (parseFloat(cashReceived) || finalPayableAmount) : finalPayableAmount);
+
+      if (method === 'cash' && rawReceived < finalPayableAmount) {
+        showToast('Cash received cannot be less than the payable amount.', 'error');
+        return false;
+      }
+
+      const rawChange = paymentDetails.changeDue !== undefined
+        ? Number(paymentDetails.changeDue)
+        : (method === 'cash' ? cashChangeDue : 0);
+
+      const ref = (paymentDetails.upiRef !== undefined ? paymentDetails.upiRef : upiRef) || '';
 
       try {
         isSubmittingRef.current = true;
@@ -509,10 +555,10 @@ export function POSProvider({ children }) {
             count: c.possibleCount,
           })),
           finalPayableAmount,
-          paymentMethod: paymentDetails.method, // 'cash' | 'upi'
-          amountReceived: Number(paymentDetails.amountReceived) || finalPayableAmount,
-          changeDue: Number(paymentDetails.changeDue) || 0,
-          upiRef: paymentDetails.upiRef || '',
+          paymentMethod: method, // 'cash' | 'upi'
+          amountReceived: rawReceived,
+          changeDue: rawChange,
+          upiRef: ref.trim(),
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           storeDetails: {
@@ -934,6 +980,13 @@ export function POSProvider({ children }) {
     originalSubtotal,
     lineReductions,
     finalPayableAmount,
+    paymentMethod,
+    setPaymentMethod,
+    cashReceived,
+    setCashReceived,
+    cashChangeDue,
+    upiRef,
+    setUpiRef,
     addProductWithPrice,
     updateItemPrice,
     customerName,

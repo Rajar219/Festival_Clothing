@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { usePOS } from '../context/POSContext';
 import { useModalBehavior } from '../hooks/useModalBehavior';
-import { formatINR, rupeesToPaise, paiseToRupees } from '../utils/currency';
+import { formatINR } from '../utils/currency';
 import {
   Banknote,
   QrCode,
   CheckCircle2,
   AlertCircle,
   X,
-  ArrowRight,
+  CreditCard,
   Info,
+  Check,
+  ShoppingBag,
+  Loader2,
 } from 'lucide-react';
 
 export function CheckoutModal() {
@@ -17,37 +20,21 @@ export function CheckoutModal() {
     isCheckoutModalOpen,
     setIsCheckoutModalOpen,
     finalPayableAmount,
+    totalPieces,
     items,
     settings,
     finalizeCheckout,
     showToast,
+    paymentMethod,
+    setPaymentMethod,
+    cashReceived,
+    setCashReceived,
+    cashChangeDue,
+    upiRef,
+    setUpiRef,
   } = usePOS();
 
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'upi'
-  const [cashReceived, setCashReceived] = useState('');
-  const [cashChangeDue, setCashChangeDue] = useState(0);
-  const [upiRef, setUpiRef] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (isCheckoutModalOpen) {
-      setPaymentMethod('cash');
-      setCashReceived(finalPayableAmount.toString());
-      setCashChangeDue(0);
-      setUpiRef('');
-      setIsSubmitting(false);
-    }
-  }, [isCheckoutModalOpen, finalPayableAmount]);
-
-  useEffect(() => {
-    if (paymentMethod === 'cash') {
-      const received = parseFloat(cashReceived) || 0;
-      const recPaise = rupeesToPaise(received);
-      const payablePaise = rupeesToPaise(finalPayableAmount);
-      const diffPaise = recPaise - payablePaise;
-      setCashChangeDue(paiseToRupees(Math.max(0, diffPaise)));
-    }
-  }, [cashReceived, finalPayableAmount, paymentMethod]);
 
   const handleClose = () => {
     if (!isSubmitting) {
@@ -62,12 +49,25 @@ export function CheckoutModal() {
 
   if (!isCheckoutModalOpen) return null;
 
+  const pieceCount = totalPieces || items.reduce((acc, it) => acc + (parseInt(it.qty, 10) || 0), 0);
+  const parsedReceived = parseFloat(cashReceived) || 0;
+  const isCashInsufficient = paymentMethod === 'cash' && parsedReceived < finalPayableAmount && parsedReceived > 0;
+
+  // Preset cash suggestions
+  const handleSetQuickCash = (extra) => {
+    if (extra === 0) {
+      setCashReceived(finalPayableAmount.toString());
+    } else {
+      const current = parseFloat(cashReceived) || finalPayableAmount;
+      setCashReceived((current + extra).toString());
+    }
+  };
+
   const denominations = [
-    finalPayableAmount,
     Math.ceil(finalPayableAmount / 500) * 500,
     1000,
     2000,
-  ].filter((val, idx, self) => val >= finalPayableAmount && self.indexOf(val) === idx);
+  ].filter((val, idx, self) => val > finalPayableAmount && self.indexOf(val) === idx);
 
   const handleFinalize = async () => {
     if (isSubmitting) return;
@@ -75,7 +75,7 @@ export function CheckoutModal() {
     if (paymentMethod === 'cash') {
       const received = parseFloat(cashReceived) || 0;
       if (received < finalPayableAmount) {
-        showToast('Cash received cannot be less than the payable amount.', 'error');
+        showToast('Cash received cannot be less than payable amount.', 'error');
         return;
       }
     }
@@ -84,10 +84,9 @@ export function CheckoutModal() {
       setIsSubmitting(true);
       await finalizeCheckout({
         method: paymentMethod,
-        tenderAmount: paymentMethod === 'cash' ? parseFloat(cashReceived) || finalPayableAmount : finalPayableAmount,
-        amountReceived: paymentMethod === 'cash' ? parseFloat(cashReceived) || finalPayableAmount : finalPayableAmount,
+        amountReceived: paymentMethod === 'cash' ? (parseFloat(cashReceived) || finalPayableAmount) : finalPayableAmount,
         changeDue: paymentMethod === 'cash' ? cashChangeDue : 0,
-        upiRef: paymentMethod === 'upi' ? upiRef : '',
+        upiRef: paymentMethod === 'upi' ? upiRef.trim() : '',
       });
     } finally {
       setIsSubmitting(false);
@@ -95,151 +94,234 @@ export function CheckoutModal() {
   };
 
   return (
-    <div className="modal-overlay" onClick={handleBackdropClick} role="dialog" aria-modal="true">
-      <div className="modal-dialog checkout-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title-wrap">
-            <h2 className="modal-title">Payment Selection</h2>
-            <span className="modal-subtitle">Choose payment method to complete bill</span>
+    <div className="modal-overlay checkout-overlay" onClick={handleBackdropClick} role="dialog" aria-modal="true">
+      <div className="modal-dialog checkout-modal-sheet" onClick={(e) => e.stopPropagation()}>
+        {/* Fixed Modal Header */}
+        <div className="checkout-modal-header">
+          <div className="checkout-header-text">
+            <div className="checkout-badge-row">
+              <span className="checkout-badge">FINAL BILLING</span>
+              <span className="checkout-meta-qty">{pieceCount} {pieceCount === 1 ? 'piece' : 'pieces'}</span>
+            </div>
+            <h2 className="checkout-modal-title">Complete Checkout</h2>
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="checkout-modal-close"
             onClick={handleClose}
             disabled={isSubmitting}
-            aria-label="Close payment dialog"
+            aria-label="Close checkout"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="modal-body">
-          {/* Payable Total Display */}
-          <div className="checkout-payable-card">
-            <span className="payable-label">Amount Payable:</span>
-            <span className="payable-value">{formatINR(finalPayableAmount, true)}</span>
+        {/* Scrollable Modal Body */}
+        <div className="checkout-modal-body">
+          {/* Amount Payable Hero Card */}
+          <div className="checkout-hero-payable">
+            <div className="hero-payable-top">
+              <span className="hero-payable-label">FINAL PAYABLE AMOUNT</span>
+              <span className="hero-currency-tag">INR (₹)</span>
+            </div>
+            <div className="hero-payable-amount">
+              {formatINR(finalPayableAmount, true)}
+            </div>
           </div>
 
-          {/* Payment Method Tabs: CASH and UPI */}
-          <div className="payment-method-tabs two-options" role="tablist">
-            <button
-              type="button"
-              className={`payment-tab-btn ${paymentMethod === 'cash' ? 'active' : ''}`}
-              onClick={() => setPaymentMethod('cash')}
-              role="tab"
-              aria-selected={paymentMethod === 'cash'}
-            >
-              <Banknote size={22} />
-              <div className="tab-label-text">
-                <span className="tab-title">CASH</span>
-                <span className="tab-sub">Paper Currency</span>
-              </div>
-            </button>
+          {/* Prompt Required Section: SELECT PAYMENT METHOD */}
+          <div className="checkout-payment-section">
+            <div className="checkout-section-header">
+              <span className="checkout-section-title">SELECT PAYMENT METHOD</span>
+              <span className="checkout-section-hint">Choose Cash or UPI to complete payment</span>
+            </div>
 
-            <button
-              type="button"
-              className={`payment-tab-btn ${paymentMethod === 'upi' ? 'active' : ''}`}
-              onClick={() => setPaymentMethod('upi')}
-              role="tab"
-              aria-selected={paymentMethod === 'upi'}
-            >
-              <QrCode size={22} />
-              <div className="tab-label-text">
-                <span className="tab-title">UPI</span>
-                <span className="tab-sub">GPay, PhonePe, Paytm QR</span>
+            <div className="payment-cards-grid" role="radiogroup" aria-label="Select Payment Method">
+              {/* CASH Payment Card */}
+              <button
+                type="button"
+                id="btn-select-cash"
+                className={`payment-selection-card ${paymentMethod === 'cash' ? 'active-card' : ''}`}
+                onClick={() => setPaymentMethod('cash')}
+                role="radio"
+                aria-checked={paymentMethod === 'cash'}
+              >
+                <div className="card-indicator">
+                  {paymentMethod === 'cash' ? (
+                    <span className="check-dot-active"><Check size={14} /></span>
+                  ) : (
+                    <span className="check-dot-inactive" />
+                  )}
+                </div>
+                <div className="card-icon-wrap">
+                  <Banknote size={26} className="payment-card-icon" />
+                </div>
+                <div className="card-info">
+                  <strong className="card-label">CASH</strong>
+                  <span className="card-subtext">Paper Currency</span>
+                </div>
+              </button>
+
+              {/* UPI Payment Card */}
+              <button
+                type="button"
+                id="btn-select-upi"
+                className={`payment-selection-card ${paymentMethod === 'upi' ? 'active-card' : ''}`}
+                onClick={() => setPaymentMethod('upi')}
+                role="radio"
+                aria-checked={paymentMethod === 'upi'}
+              >
+                <div className="card-indicator">
+                  {paymentMethod === 'upi' ? (
+                    <span className="check-dot-active"><Check size={14} /></span>
+                  ) : (
+                    <span className="check-dot-inactive" />
+                  )}
+                </div>
+                <div className="card-icon-wrap">
+                  <QrCode size={26} className="payment-card-icon" />
+                </div>
+                <div className="card-info">
+                  <strong className="card-label">UPI</strong>
+                  <span className="card-subtext">QR / GPay / PhonePe</span>
+                </div>
+              </button>
+            </div>
+
+            {/* CASH Payment Behaviour */}
+            {paymentMethod === 'cash' && (
+              <div className="payment-active-detail-box cash-active-box">
+                <label htmlFor="modal-cash-received" className="detail-box-label">
+                  Amount Received from Customer (₹)
+                </label>
+                <div className="cash-input-container">
+                  <span className="cash-currency-symbol">₹</span>
+                  <input
+                    id="modal-cash-received"
+                    type="number"
+                    inputMode="decimal"
+                    step="1"
+                    min="0"
+                    className="modal-cash-input"
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="Enter cash received"
+                    disabled={isSubmitting}
+                    autoFocus
+                  />
+                </div>
+
+                {/* Quick Cash Tender Presets */}
+                <div className="modal-tender-presets">
+                  <span className="presets-caption">Quick Presets:</span>
+                  <div className="presets-btn-row">
+                    <button
+                      type="button"
+                      className="modal-preset-btn"
+                      onClick={() => handleSetQuickCash(0)}
+                    >
+                      Exact (₹{finalPayableAmount})
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-preset-btn"
+                      onClick={() => handleSetQuickCash(100)}
+                    >
+                      +₹100
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-preset-btn"
+                      onClick={() => handleSetQuickCash(500)}
+                    >
+                      +₹500
+                    </button>
+                    {denominations.map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        className="modal-preset-btn"
+                        onClick={() => setCashReceived(val.toString())}
+                      >
+                        ₹{val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Validation alert if cash received is less than payable */}
+                {isCashInsufficient && (
+                  <div className="insufficient-cash-alert">
+                    <AlertCircle size={15} />
+                    <span>Cash received is less than payable amount (₹{finalPayableAmount}).</span>
+                  </div>
+                )}
+
+                {/* Balance / Change Calculation */}
+                <div className="change-return-summary">
+                  <div className="change-left">
+                    <span className="change-label">Change to Return:</span>
+                    <span className="change-sub">Return balance to customer</span>
+                  </div>
+                  <div className={`change-amount-display ${cashChangeDue > 0 ? 'has-change' : ''}`}>
+                    {formatINR(cashChangeDue, true)}
+                  </div>
+                </div>
               </div>
-            </button>
+            )}
+
+            {/* UPI Payment Behaviour */}
+            {paymentMethod === 'upi' && (
+              <div className="payment-active-detail-box upi-active-box">
+                <div className="upi-qr-card">
+                  <div className="upi-qr-badge">
+                    <QrCode size={48} className="upi-qr-symbol" />
+                    <span className="qr-badge-text">Shop QR</span>
+                  </div>
+                  <div className="upi-qr-meta">
+                    <div className="vpa-line">
+                      <span className="vpa-lbl">Shop UPI ID:</span>
+                      <strong className="vpa-code">{settings.upiId || 'festivalclothing@okhdfcbank'}</strong>
+                    </div>
+                    <div className="vpa-exact-line">
+                      <span>Pay Exact Amount: </span>
+                      <strong className="vpa-amt">{formatINR(finalPayableAmount, true)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="upi-ref-group">
+                  <label htmlFor="modal-upi-ref" className="detail-box-label">
+                    UPI Reference / UTR Number (Optional)
+                  </label>
+                  <input
+                    id="modal-upi-ref"
+                    type="text"
+                    className="modal-upi-input"
+                    value={upiRef}
+                    onChange={(e) => setUpiRef(e.target.value)}
+                    placeholder="e.g. 428901238912 (12-digit UTR)"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div className="upi-confirmation-notice">
+                  <Info size={15} />
+                  <span>
+                    Payment recorded as UPI. Confirm receipt on shop QR soundbox/terminal before completing bill.
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Cash Payment Details */}
-          {paymentMethod === 'cash' && (
-            <div className="payment-content-section cash-section">
-              <label className="input-group-label">Amount Received (₹)</label>
-              <div className="tendered-input-wrap">
-                <span className="currency-prefix">₹</span>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  className="tendered-input"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  placeholder="Enter cash received"
-                  autoFocus
-                />
-              </div>
-
-              {/* Quick Preset Tender Chips */}
-              <div className="quick-denom-chips">
-                <span className="denom-label">Quick Tender:</span>
-                {denominations.map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    className="denom-btn"
-                    onClick={() => setCashReceived(val.toString())}
-                  >
-                    ₹{val}
-                  </button>
-                ))}
-              </div>
-
-              {/* Change Due Box */}
-              <div className="change-due-box">
-                <span className="change-label">Change to Return to Customer:</span>
-                <span className={`change-amount ${cashChangeDue > 0 ? 'highlight-change' : ''}`}>
-                  {formatINR(cashChangeDue, true)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* UPI Payment Details */}
-          {paymentMethod === 'upi' && (
-            <div className="payment-content-section upi-section">
-              <div className="upi-info-card">
-                <div className="upi-qr-placeholder">
-                  <QrCode size={56} className="qr-icon" />
-                  <span className="qr-hint">Scan & Pay</span>
-                </div>
-                <div className="upi-text-info">
-                  <div className="vpa-display">
-                    <span className="vpa-label">Shop UPI ID:</span>
-                    <strong className="vpa-id">{settings.upiId || 'festivalclothing@okhdfcbank'}</strong>
-                  </div>
-                  <div className="vpa-amount">
-                    <span>Pay Exact: </span>
-                    <strong>{formatINR(finalPayableAmount, true)}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="upi-ref-field">
-                <label className="input-group-label">UPI Reference / UTR Number (Optional)</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. 428901238912"
-                  value={upiRef}
-                  onChange={(e) => setUpiRef(e.target.value)}
-                />
-              </div>
-
-              <div className="upi-disclaimer-note">
-                <Info size={14} />
-                <span>
-                  Note: Payment recorded as manual UPI transfer. Gateway status will be verified via bank reconciliation.
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
-        <div className="modal-footer">
+        {/* Fixed Sticky Modal Footer */}
+        <div className="checkout-modal-footer">
           <button
             type="button"
-            className="btn-secondary"
-            onClick={() => setIsCheckoutModalOpen(false)}
+            className="checkout-cancel-btn"
+            onClick={handleClose}
             disabled={isSubmitting}
           >
             Cancel
@@ -248,15 +330,26 @@ export function CheckoutModal() {
           <button
             type="button"
             id="btn-confirm-checkout"
-            className="btn-success finalize-btn"
+            className="checkout-finalize-btn"
             onClick={handleFinalize}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (paymentMethod === 'cash' && parsedReceived < finalPayableAmount)}
           >
-            <CheckCircle2 size={18} />
-            <span>{isSubmitting ? 'Recording Bill...' : `Confirm & Finalize Bill`}</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 size={18} className="spinning" />
+                <span>Recording Bill...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={18} />
+                <span>Confirm & Finalize Bill ({paymentMethod.toUpperCase()})</span>
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+export default CheckoutModal;

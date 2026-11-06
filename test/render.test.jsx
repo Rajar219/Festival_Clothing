@@ -186,4 +186,93 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('align-items: flex-end');
     expect(cssContent).toContain('border-radius: 20px 20px 0 0');
   });
+
+  it('verifies CheckoutModal renders SELECT PAYMENT METHOD with CASH and UPI selectable cards and cash/UPI behavior', async () => {
+    const { CheckoutModal } = await import('../src/components/CheckoutModal');
+    const { POSContext } = await import('../src/context/POSContext');
+    const { DEFAULT_SETTINGS } = await import('../src/services/db');
+
+    const mockCashPOS = {
+      isCheckoutModalOpen: true,
+      setIsCheckoutModalOpen: () => {},
+      finalPayableAmount: 1200,
+      totalPieces: 2,
+      items: [{ id: '1', name: 'Shirt', qty: 2, unitPrice: 600 }],
+      settings: DEFAULT_SETTINGS,
+      finalizeCheckout: async () => {},
+      showToast: () => {},
+      paymentMethod: 'cash',
+      setPaymentMethod: () => {},
+      cashReceived: '1500',
+      setCashReceived: () => {},
+      cashChangeDue: 300,
+      upiRef: '',
+      setUpiRef: () => {},
+    };
+
+    const cashHtml = renderToString(
+      <POSContext.Provider value={mockCashPOS}>
+        <CheckoutModal />
+      </POSContext.Provider>
+    );
+
+    // 1. Title and Amount Payable
+    expect(cashHtml).toContain('Complete Checkout');
+    expect(cashHtml).toContain('FINAL PAYABLE AMOUNT');
+    expect(cashHtml).toContain('1,200');
+
+    // 2. Select Payment Method Section
+    expect(cashHtml).toContain('SELECT PAYMENT METHOD');
+    expect(cashHtml).toContain('CASH');
+    expect(cashHtml).toContain('Paper Currency');
+    expect(cashHtml).toContain('UPI');
+    expect(cashHtml).toContain('QR / GPay / PhonePe');
+
+    // 3. Cash active fields
+    expect(cashHtml).toContain('Amount Received from Customer');
+    expect(cashHtml).toContain('Change to Return:');
+    expect(cashHtml).toContain('300');
+    expect(cashHtml).toContain('Exact');
+    expect(cashHtml).toContain('+₹100');
+    expect(cashHtml).toContain('+₹500');
+
+    // 4. Confirm Finalize Button
+    expect(cashHtml).toContain('btn-confirm-checkout');
+    expect(cashHtml).toContain('Confirm &amp; Finalize Bill');
+
+    // Test UPI state
+    const mockUpiPOS = {
+      ...mockCashPOS,
+      paymentMethod: 'upi',
+      upiRef: '428901238912',
+    };
+
+    const upiHtml = renderToString(
+      <POSContext.Provider value={mockUpiPOS}>
+        <CheckoutModal />
+      </POSContext.Provider>
+    );
+
+    expect(upiHtml).toContain('festivalclothing@okhdfcbank');
+    expect(upiHtml).toContain('Pay Exact Amount');
+    expect(upiHtml).toContain('UPI Reference / UTR Number');
+    expect(upiHtml).toContain('Confirm &amp; Finalize Bill');
+  });
+
+  it('verifies index.css contains emerald green active states and mobile checkout responsive rules', () => {
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Check payment cards grid & emerald active styles
+    expect(cssContent).toContain('.payment-cards-grid');
+    expect(cssContent).toContain('.payment-selection-card');
+    expect(cssContent).toContain('.payment-selection-card.active-card');
+    expect(cssContent).toContain('#059669'); // Emerald green
+    expect(cssContent).toContain('#ecfdf5'); // Emerald tint
+
+    // Check mobile bottom sheet
+    expect(cssContent).toContain('.checkout-modal-sheet');
+    expect(cssContent).toContain('max-height: 90dvh');
+    expect(cssContent).toContain('.checkout-finalize-btn');
+  });
 });

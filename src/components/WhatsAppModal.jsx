@@ -314,7 +314,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
                 <FileText size={18} className="pdf-icon" />
                 <div>
                   <strong>A4 Retail Invoice PDF</strong>
-                  <p>Includes itemized ₹10 Less reductions & WISDO TECH attribution.</p>
+                  <p>Includes itemized retail reductions and full order breakdown.</p>
                 </div>
               </div>
               <button

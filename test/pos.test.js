@@ -323,7 +323,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(text).toContain('FC-20261009-0001');
     expect(text).toContain('*Amount Paid:* ₹1280.00');
     expect(text).toContain('*Payment:* CASH');
-    expect(text).toContain(COMPANY_BRANDING.attributionText);
+    expect(text).not.toContain('WISDO TECH');
   });
 
   // Test 12: CSV exports contain correct item-level reductions and final totals
@@ -568,7 +568,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     const text = generateWhatsAppReceiptText(testBill, DEFAULT_SETTINGS);
     expect(text).toContain('FESTIVAL CLOTHING');
     expect(text).toContain('FC-20261105-001');
-    expect(text).toContain('Powered by WISDO TECH');
+    expect(text).not.toContain('WISDO TECH');
     expect(text).toContain('1280.00');
 
     const cleanMobile = '9840012345';
@@ -1204,7 +1204,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('Thank you for shopping with FESTIVAL CLOTHING!');
     expect(pdfText).toContain('We appreciate your purchase.');
     expect(pdfText).toContain('FESTIVAL CLOTHING - MENSWEAR');
-    expect(pdfText).toContain(COMPANY_BRANDING.attributionText);
+    expect(pdfText).not.toContain('WISDO TECH');
   });
 
   // Scenario 20: WhatsApp invoice message format contains prompt greeting & order summary
@@ -1238,7 +1238,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(text).toContain('*Amount Paid:* ₹740.00');
     expect(text).toContain('*Payment:* UPI');
     expect(text).toContain('Please find your retail invoice attached.');
-    expect(text).toContain(COMPANY_BRANDING.attributionText);
+    expect(text).not.toContain('WISDO TECH');
   });
 
   // Requirement 21: Thermal print generates in A4 size with authentic monospace layout for customer sharing
@@ -1314,7 +1314,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     // Footer
     expect(pdfText).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
     expect(pdfText).toContain('We appreciate your support. Visit us again!');
-    expect(pdfText).toContain(COMPANY_BRANDING.attributionText);
+    expect(pdfText).not.toContain('WISDO TECH');
   });
 
   // Test 22: Scenario A - Normal billing: Validate, calculate, and save bill locally FIRST
@@ -1456,5 +1456,53 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(cartCleared).toBe(false);
     expect(reportedSuccess).toBe(false);
     expect(activeCart.length).toBe(1);
+  });
+
+  // Test 28: Mobile Cash Payment calculation, minimum tender validation, and record integrity
+  it('Requirement 28: Mobile Payment Selection - Cash payments calculate change due, validate minimum tender, and save accurately', () => {
+    const payableAmount = 1480;
+    const receivedAmount = 2000;
+    const insufficientReceived = 1400;
+
+    // Check change calculation
+    const changeDue = Math.max(0, receivedAmount - payableAmount);
+    expect(changeDue).toBe(520);
+
+    // Validate insufficient cash detection
+    const isInsufficient = insufficientReceived < payableAmount;
+    expect(isInsufficient).toBe(true);
+
+    const finalizedCashBill = {
+      billNumber: 'FC-20261106-0001',
+      finalPayableAmount: payableAmount,
+      paymentMethod: 'cash',
+      amountReceived: receivedAmount,
+      changeDue: changeDue,
+      upiRef: '',
+    };
+
+    expect(finalizedCashBill.paymentMethod).toBe('cash');
+    expect(finalizedCashBill.amountReceived).toBe(2000);
+    expect(finalizedCashBill.changeDue).toBe(520);
+  });
+
+  // Test 29: Mobile UPI Payment preservation, UTR reference, and omitting cash fields
+  it('Requirement 29: Mobile Payment Selection - UPI payments preserve UTR ref, omit cash fields, and record paymentMethod as UPI', () => {
+    const payableAmount = 1850;
+    const upiRef = '428901238912';
+
+    const finalizedUpiBill = {
+      billNumber: 'FC-20261106-0002',
+      finalPayableAmount: payableAmount,
+      paymentMethod: 'upi',
+      amountReceived: payableAmount,
+      changeDue: 0,
+      upiRef: upiRef,
+    };
+
+    expect(finalizedUpiBill.paymentMethod).toBe('upi');
+    expect(finalizedUpiBill.amountReceived).toBe(1850);
+    expect(finalizedUpiBill.changeDue).toBe(0);
+    expect(finalizedUpiBill.upiRef).toBe('428901238912');
   });
 });

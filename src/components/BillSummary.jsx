@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { usePOS } from '../context/POSContext';
-import { formatINR, rupeesToPaise, paiseToRupees } from '../utils/currency';
+import { formatINR } from '../utils/currency';
 import { COMPANY_BRANDING } from '../services/db';
 import {
   Banknote,
@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle,
   CreditCard,
+  Check,
 } from 'lucide-react';
 
 export function BillSummary() {
@@ -28,32 +29,18 @@ export function BillSummary() {
     finalizeCheckout,
     startNewBill,
     showToast,
+    paymentMethod,
+    setPaymentMethod,
+    cashReceived,
+    setCashReceived,
+    cashChangeDue,
+    upiRef,
+    setUpiRef,
+    setIsCheckoutModalOpen,
   } = usePOS();
 
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'upi'
-  const [cashReceived, setCashReceived] = useState('');
-  const [cashChangeDue, setCashChangeDue] = useState(0);
-  const [upiRef, setUpiRef] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-
-  // Keep cash received updated when payable total changes
-  useEffect(() => {
-    setCashReceived(finalPayableAmount > 0 ? finalPayableAmount.toString() : '');
-  }, [finalPayableAmount]);
-
-  // Recalculate change due
-  useEffect(() => {
-    if (paymentMethod === 'cash') {
-      const received = parseFloat(cashReceived) || 0;
-      const recPaise = rupeesToPaise(received);
-      const payablePaise = rupeesToPaise(finalPayableAmount);
-      const diffPaise = recPaise - payablePaise;
-      setCashChangeDue(paiseToRupees(Math.max(0, diffPaise)));
-    } else {
-      setCashChangeDue(0);
-    }
-  }, [cashReceived, finalPayableAmount, paymentMethod]);
 
   const pieceCount = totalPieces || items.reduce((acc, it) => acc + (parseInt(it.qty, 10) || 0), 0);
   const isBillReady = items.length > 0 && finalPayableAmount >= 0;
@@ -68,7 +55,7 @@ export function BillSummary() {
     }
   };
 
-  // Fast 1-click complete bill
+  // Fast 1-click complete bill (Desktop & Direct)
   const handleFastCompleteBill = useCallback(async () => {
     if (!isBillReady || isSaving) return;
 
@@ -86,7 +73,7 @@ export function BillSummary() {
 
       const result = await finalizeCheckout({
         method: paymentMethod,
-        amountReceived: paymentMethod === 'cash' ? parseFloat(cashReceived) || finalPayableAmount : finalPayableAmount,
+        amountReceived: paymentMethod === 'cash' ? (parseFloat(cashReceived) || finalPayableAmount) : finalPayableAmount,
         changeDue: paymentMethod === 'cash' ? cashChangeDue : 0,
         upiRef: paymentMethod === 'upi' ? upiRef.trim() : '',
       });
@@ -175,19 +162,27 @@ export function BillSummary() {
           </div>
         </div>
 
-        {/* Payment Method Selector */}
+        {/* Prompt Required Section: SELECT PAYMENT METHOD */}
         <div className="payment-method-section">
-          <span className="payment-section-label">PAYMENT METHOD</span>
-          <div className="payment-toggle-grid">
+          <div className="payment-section-header-wrap">
+            <span className="payment-section-label">SELECT PAYMENT METHOD</span>
+          </div>
+
+          <div className="payment-toggle-grid" role="radiogroup" aria-label="Select Payment Method">
             <button
               type="button"
               id="btn-select-cash"
               className={`quick-pay-btn ${paymentMethod === 'cash' ? 'active' : ''}`}
               onClick={() => setPaymentMethod('cash')}
               disabled={isSaving}
+              role="radio"
+              aria-checked={paymentMethod === 'cash'}
             >
               <Banknote size={18} />
-              <span>CASH</span>
+              <div className="pay-btn-label-group">
+                <span className="pay-btn-main">CASH</span>
+                <span className="pay-btn-sub">Cash Currency</span>
+              </div>
             </button>
             <button
               type="button"
@@ -195,9 +190,14 @@ export function BillSummary() {
               className={`quick-pay-btn ${paymentMethod === 'upi' ? 'active' : ''}`}
               onClick={() => setPaymentMethod('upi')}
               disabled={isSaving}
+              role="radio"
+              aria-checked={paymentMethod === 'upi'}
             >
               <QrCode size={18} />
-              <span>UPI</span>
+              <div className="pay-btn-label-group">
+                <span className="pay-btn-main">UPI</span>
+                <span className="pay-btn-sub">GPay / QR</span>
+              </div>
             </button>
           </div>
 
@@ -251,12 +251,12 @@ export function BillSummary() {
               )}
 
               {/* Change Due Callout */}
-              {cashChangeDue > 0 && (
-                <div className="change-return-pill">
-                  <span>Change Due:</span>
-                  <strong>{formatINR(cashChangeDue, true)}</strong>
-                </div>
-              )}
+              <div className="change-return-pill">
+                <span>Change Due:</span>
+                <strong className={cashChangeDue > 0 ? 'highlight-green' : ''}>
+                  {formatINR(cashChangeDue, true)}
+                </strong>
+              </div>
             </div>
           )}
 
@@ -272,6 +272,9 @@ export function BillSummary() {
                   placeholder="UPI Ref / UTR (Optional)"
                   disabled={isSaving}
                 />
+              </div>
+              <div className="upi-quick-note">
+                <small>Pay exact ₹{finalPayableAmount} via Shop QR</small>
               </div>
             </div>
           )}
@@ -311,7 +314,7 @@ export function BillSummary() {
           ) : (
             <>
               <CheckCircle2 size={18} />
-              <span>Complete Bill</span>
+              <span>Complete Bill ({paymentMethod.toUpperCase()})</span>
               <kbd className="shortcut-btn-hint">Alt+C</kbd>
             </>
           )}
@@ -351,21 +354,14 @@ export function BillSummary() {
           <div className="mobile-sticky-actions">
             <button
               type="button"
+              id="btn-mobile-checkout"
               className="mobile-sticky-pay-btn"
               disabled={!isBillReady || isSaving}
-              onClick={handleFastCompleteBill}
+              onClick={() => setIsCheckoutModalOpen(true)}
+              title="Open Checkout & Payment Selection"
             >
-              {isSaving ? (
-                <>
-                  <Loader2 size={16} className="spinning" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={16} />
-                  <span>Complete ({paymentMethod.toUpperCase()})</span>
-                </>
-              )}
+              <CreditCard size={18} />
+              <span>Checkout • {formatINR(finalPayableAmount, true)}</span>
             </button>
           </div>
         </div>
@@ -374,3 +370,4 @@ export function BillSummary() {
   );
 }
 
+export default BillSummary;

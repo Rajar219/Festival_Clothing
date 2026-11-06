@@ -1,6 +1,5 @@
 import { jsPDF } from 'jspdf';
 import { formatINR, formatDateTime } from './currency';
-import { COMPANY_BRANDING } from '../services/db';
 
 /**
  * Validates and cleans Indian mobile numbers
@@ -48,19 +47,17 @@ export function validateIndianMobile(raw) {
  */
 export function generateWhatsAppReceiptText(bill, settings = {}) {
   const shopName = bill.storeDetails?.name || settings.shopName || 'FESTIVAL CLOTHING';
-  const attribution = COMPANY_BRANDING.attributionText;
   const paymentUpper = (bill.paymentMethod || 'cash').toUpperCase();
   const grandTotal = (bill.finalPayableAmount || 0).toFixed(2);
 
-  // Exact two-line greeting
+  // Exact clean two-line customer greeting (Zero 3rd party branding)
   let text = `Thanks for purchasing from ${shopName.toUpperCase()}!\n\n`;
   text += `We appreciate your support. Visit us again!\n\n`;
   text += `*Invoice No:* ${bill.billNumber}\n`;
   text += `*Date:* ${formatDateTime(bill.createdAt)}\n`;
   text += `*Amount Paid:* ₹${grandTotal}\n`;
   text += `*Payment:* ${paymentUpper}\n\n`;
-  text += `Please find your retail invoice attached.\n\n`;
-  text += `_${attribution}_`;
+  text += `Please find your retail invoice attached.`;
 
   return text;
 }
@@ -305,11 +302,6 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.setFont('courier', 'bold');
     doc.setFontSize(9);
     doc.text('FESTIVAL CLOTHING - MENSWEAR', pageCenter, y, { align: 'center' });
-    y += 4.5;
-
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(8.5);
-    doc.text(`${COMPANY_BRANDING.attributionText} / wisdotech.in`, pageCenter, y, { align: 'center' });
 
     const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {
@@ -582,11 +574,6 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.setFontSize(8.5);
     doc.setTextColor(6, 78, 59);
     doc.text('FESTIVAL CLOTHING - MENSWEAR', 105, y, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(5, 150, 105);
-    doc.text(`${COMPANY_BRANDING.attributionText} / wisdotech.in`, 105, y + 4.5, { align: 'center' });
 
     const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {
