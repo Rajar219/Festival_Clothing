@@ -173,6 +173,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     });
   }, [allBills, dateFilter, statusFilter, terminalFilter, paymentFilter, searchTerm, todayStart, yesterdayStart, weekStart, monthStart]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && filteredBills.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('details') === 'true') {
+        setSelectedBill(filteredBills[0]);
+      }
+    }
+  }, [filteredBills]);
+
   // Comprehensive Sales Metrics & Parity Analytics
   const stats = useMemo(() => {
     let totalSales = 0;
@@ -491,9 +500,51 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           ==================================================================== */}
       {activeViewMode === 'reports' && (
         <div className="reports-analytics-section">
-          {/* Executive Performance Milestones Cards */}
+          {/* Top Date Filter Chips for Instant Period Switching */}
+          <div className="reports-date-filter-bar">
+            <span className="reports-date-label">Report Period:</span>
+            <div className="date-filter-tabs">
+              <button
+                type="button"
+                className={`date-tab ${dateFilter === 'today' ? 'active' : ''}`}
+                onClick={() => setDateFilter('today')}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className={`date-tab ${dateFilter === 'yesterday' ? 'active' : ''}`}
+                onClick={() => setDateFilter('yesterday')}
+              >
+                Yesterday
+              </button>
+              <button
+                type="button"
+                className={`date-tab ${dateFilter === 'week' ? 'active' : ''}`}
+                onClick={() => setDateFilter('week')}
+              >
+                7 Days
+              </button>
+              <button
+                type="button"
+                className={`date-tab ${dateFilter === 'month' ? 'active' : ''}`}
+                onClick={() => setDateFilter('month')}
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                className={`date-tab ${dateFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setDateFilter('all')}
+              >
+                All Time
+              </button>
+            </div>
+          </div>
+
+          {/* Executive Performance Milestones Cards (6-Core KPI Grid) */}
           <div className="kpi-grid">
-            {/* Today's Sales */}
+            {/* 1. Today's Sales */}
             <div className="kpi-card today-kpi">
               <div className="kpi-icon-box">
                 <TrendingUp size={22} />
@@ -505,43 +556,19 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               </div>
             </div>
 
-            {/* Yesterday's Sales */}
-            <div className="kpi-card yesterday-kpi">
-              <div className="kpi-icon-box">
-                <History size={22} />
-              </div>
-              <div className="kpi-data">
-                <span className="kpi-title">Yesterday's Sales</span>
-                <span className="kpi-value">{formatINR(stats.yesterdaySales, true)}</span>
-                <span className="kpi-subtext">{stats.yesterdayCount} bill(s) yesterday</span>
-              </div>
-            </div>
-
-            {/* Monthly Sales */}
-            <div className="kpi-card month-kpi">
-              <div className="kpi-icon-box">
-                <Calendar size={22} />
-              </div>
-              <div className="kpi-data">
-                <span className="kpi-title">This Month</span>
-                <span className="kpi-value">{formatINR(stats.monthSales, true)}</span>
-                <span className="kpi-subtext">{stats.monthCount} bill(s) this month</span>
-              </div>
-            </div>
-
-            {/* Filtered Period Total */}
+            {/* 2. Total Bills in Period */}
             <div className="kpi-card total-kpi">
               <div className="kpi-icon-box">
                 <BarChart3 size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">Period Revenue ({dateFilter.toUpperCase()})</span>
-                <span className="kpi-value">{formatINR(stats.totalSales, true)}</span>
-                <span className="kpi-subtext">{stats.validCount} valid bills ({stats.totalUnitsSold} items)</span>
+                <span className="kpi-title">Total Bills</span>
+                <span className="kpi-value">{stats.validCount}</span>
+                <span className="kpi-subtext">{formatINR(stats.totalSales, true)} period sales</span>
               </div>
             </div>
 
-            {/* Cash Collected */}
+            {/* 3. Cash Collections */}
             <div className="kpi-card cash-kpi">
               <div className="kpi-icon-box">
                 <Banknote size={22} />
@@ -553,66 +580,89 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               </div>
             </div>
 
-            {/* UPI Collected */}
+            {/* 4. UPI Collections */}
             <div className="kpi-card upi-kpi">
               <div className="kpi-icon-box">
                 <QrCode size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">UPI Digital Collections</span>
+                <span className="kpi-title">UPI Collections</span>
                 <span className="kpi-value">{formatINR(stats.upiTotal, true)}</span>
-                <span className="kpi-subtext">Instant bank QR transfers</span>
+                <span className="kpi-subtext">Instant QR transfers</span>
               </div>
             </div>
 
-            {/* Customer Discounts & Savings */}
+            {/* 5. Total Item Discounts */}
             <div className="kpi-card savings-kpi">
               <div className="kpi-icon-box">
                 <Tag size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">Total Customer Savings</span>
-                <span className="kpi-value">{formatINR(stats.totalCustomerSavings, true)}</span>
-                <span className="kpi-subtext">Item reductions + Combo offers</span>
+                <span className="kpi-title">Total Discounts</span>
+                <span className="kpi-value">{formatINR(stats.totalDiscounts, true)}</span>
+                <span className="kpi-subtext">Item-level reductions</span>
               </div>
             </div>
 
-            {/* Cancelled Bills */}
-            <div className="kpi-card cancelled-kpi">
+            {/* 6. Combo Savings */}
+            <div className="kpi-card combo-kpi">
               <div className="kpi-icon-box">
-                <Ban size={22} />
+                <Package size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">Voided / Cancelled</span>
-                <span className="kpi-value">{stats.cancelledCount} Bills</span>
-                <span className="kpi-subtext">Audit-preserved voids</span>
+                <span className="kpi-title">Combo Savings</span>
+                <span className="kpi-value">{formatINR(stats.totalComboSavings, true)}</span>
+                <span className="kpi-subtext">Bundle package savings</span>
+              </div>
+            </div>
+
+            {/* Desktop-only bonus cards */}
+            <div className="kpi-card yesterday-kpi desktop-only">
+              <div className="kpi-icon-box">
+                <History size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">Yesterday's Sales</span>
+                <span className="kpi-value">{formatINR(stats.yesterdaySales, true)}</span>
+                <span className="kpi-subtext">{stats.yesterdayCount} bill(s) yesterday</span>
+              </div>
+            </div>
+
+            <div className="kpi-card month-kpi desktop-only">
+              <div className="kpi-icon-box">
+                <Calendar size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">This Month</span>
+                <span className="kpi-value">{formatINR(stats.monthSales, true)}</span>
+                <span className="kpi-subtext">{stats.monthCount} bill(s) this month</span>
               </div>
             </div>
           </div>
 
-          {/* Comparative Distribution Cards: PC vs Mobile & Cash vs UPI */}
+          {/* Comparative Distribution Cards: PC vs Mobile, Cash vs UPI, Discounts vs Combos */}
           <div className="reports-comparative-grid">
             {/* Terminal Breakdown: PC vs Mobile Handheld */}
             <div className="report-distribution-card">
               <div className="dist-header">
                 <div className="dist-title-wrap">
                   <Laptop size={18} className="dist-icon" />
-                  <h3>Terminal Breakdown (PC vs Mobile)</h3>
+                  <h3>Terminal Analysis (PC vs Mobile)</h3>
                 </div>
                 <span className="dist-badge">Active Range</span>
               </div>
 
               <div className="dist-stats-row">
                 <div className="dist-col">
-                  <span className="dist-label">PC Counter Terminal</span>
+                  <span className="dist-label">PC Counter</span>
                   <span className="dist-value">{formatINR(stats.pcSales, true)}</span>
-                  <span className="dist-sub">{stats.pcCount} bills</span>
+                  <span className="dist-sub">{stats.pcCount} bills ({stats.totalSales > 0 ? Math.round((stats.pcSales / stats.totalSales) * 100) : 0}%)</span>
                 </div>
                 <div className="dist-divider-v" />
                 <div className="dist-col">
-                  <span className="dist-label">Mobile Floor Handheld</span>
+                  <span className="dist-label">Mobile Handheld</span>
                   <span className="dist-value">{formatINR(stats.mobileSales, true)}</span>
-                  <span className="dist-sub">{stats.mobileCount} bills</span>
+                  <span className="dist-sub">{stats.mobileCount} bills ({stats.totalSales > 0 ? Math.round((stats.mobileSales / stats.totalSales) * 100) : 0}%)</span>
                 </div>
               </div>
 
@@ -640,7 +690,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <div className="dist-header">
                 <div className="dist-title-wrap">
                   <Banknote size={18} className="dist-icon" />
-                  <h3>Payment Split (Cash vs UPI)</h3>
+                  <h3>Payment Analysis (Cash vs UPI)</h3>
                 </div>
                 <span className="dist-badge">Collections</span>
               </div>
@@ -676,6 +726,51 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   style={{
                     width: stats.totalSales > 0 ? `${(stats.upiTotal / stats.totalSales) * 100}%` : '50%',
                   }}
+                />
+              </div>
+            </div>
+
+            {/* Discount and Combo Analysis Card */}
+            <div className="report-distribution-card">
+              <div className="dist-header">
+                <div className="dist-title-wrap">
+                  <Tag size={18} className="dist-icon" />
+                  <h3>Savings Analysis (Discounts vs Combos)</h3>
+                </div>
+                <span className="dist-badge">Customer Value</span>
+              </div>
+
+              <div className="dist-stats-row">
+                <div className="dist-col">
+                  <span className="dist-label">Item Discounts</span>
+                  <span className="dist-value">{formatINR(stats.totalDiscounts, true)}</span>
+                  <span className="dist-sub">Direct reductions</span>
+                </div>
+                <div className="dist-divider-v" />
+                <div className="dist-col">
+                  <span className="dist-label">Combo Savings</span>
+                  <span className="dist-value">{formatINR(stats.totalComboSavings, true)}</span>
+                  <span className="dist-sub">Package bundle savings</span>
+                </div>
+              </div>
+
+              {/* Visual Split Bar */}
+              <div className="dist-bar-track">
+                <div
+                  className="dist-bar-fill discount"
+                  style={{
+                    width: stats.totalCustomerSavings > 0 ? `${(stats.totalDiscounts / stats.totalCustomerSavings) * 100}%` : '50%',
+                    background: '#f59e0b',
+                  }}
+                  title={`Discounts: ${stats.totalCustomerSavings > 0 ? Math.round((stats.totalDiscounts / stats.totalCustomerSavings) * 100) : 0}%`}
+                />
+                <div
+                  className="dist-bar-fill combo"
+                  style={{
+                    width: stats.totalCustomerSavings > 0 ? `${(stats.totalComboSavings / stats.totalCustomerSavings) * 100}%` : '50%',
+                    background: '#059669',
+                  }}
+                  title={`Combos: ${stats.totalCustomerSavings > 0 ? Math.round((stats.totalComboSavings / stats.totalCustomerSavings) * 100) : 0}%`}
                 />
               </div>
             </div>
@@ -816,6 +911,51 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       {/* ====================================================================
           MODE 2: SALES HISTORY VIEW
           ==================================================================== */}
+      {/* Mobile-Friendly Sales History Header & Period Summary Bar */}
+      {activeViewMode === 'history' && (
+        <div className="mobile-sales-summary-bar">
+          <div className="mobile-sales-summary-info">
+            <div className="mobile-sales-title-row">
+              <h2 className="mobile-sales-page-title">Sales History</h2>
+              <span className="mobile-sales-count-pill">{filteredBills.length} {filteredBills.length === 1 ? 'Bill' : 'Bills'}</span>
+            </div>
+            <div className="mobile-sales-stats-row">
+              <span className="summary-stat-label">Period Sales:</span>
+              <strong className="summary-stat-amount">{formatINR(stats.totalSales, true)}</strong>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`mobile-sync-chip-btn ${syncState?.status || 'synced'}`}
+            onClick={triggerManualSync}
+            title="Click to synchronise sales now"
+            disabled={syncState?.status === 'syncing'}
+          >
+            {syncState?.status === 'syncing' ? (
+              <>
+                <RotateCcw size={12} className="spinning" />
+                <span>Syncing...</span>
+              </>
+            ) : (syncState?.pendingCount || 0) > 0 ? (
+              <>
+                <Cloud size={12} color="#f59e0b" />
+                <span>{syncState.pendingCount} Pending</span>
+              </>
+            ) : isFirebaseConfigured ? (
+              <>
+                <CheckCircle2 size={12} color="#10b981" />
+                <span>Live Synced</span>
+              </>
+            ) : (
+              <>
+                <Database size={12} />
+                <span>Local DB</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Control Bar: Filters & Export Actions (Visible in both, with focus on History) */}
       <div className="reports-control-bar">
         <div className="search-filter-group">
@@ -954,6 +1094,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   <td colSpan={11} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
                     <p>No bills found for the selected filter criteria.</p>
+                    <button
+                      type="button"
+                      className="btn-reset-filters"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setDateFilter('all');
+                        setTerminalFilter('all');
+                        setPaymentFilter('all');
+                        setStatusFilter('all');
+                      }}
+                    >
+                      <RotateCcw size={13} />
+                      <span>Reset Filters</span>
+                    </button>
                   </td>
                 </tr>
               ) : (
@@ -1078,6 +1232,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <div className="mobile-empty-ledger">
               <AlertTriangle size={32} className="empty-alert-icon" />
               <p>No bills found for the selected filter criteria.</p>
+              <button
+                type="button"
+                className="btn-reset-filters"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDateFilter('all');
+                  setTerminalFilter('all');
+                  setPaymentFilter('all');
+                  setStatusFilter('all');
+                }}
+              >
+                <RotateCcw size={13} />
+                <span>Reset Filters</span>
+              </button>
             </div>
           ) : (
             filteredBills.map((bill, index) => {

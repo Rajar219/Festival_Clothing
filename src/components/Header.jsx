@@ -155,7 +155,7 @@ export function Header() {
         <div className="header-right">
           {/* Subtle Terminal Badge */}
           <span
-            className="header-subtle-badge desktop-only"
+            className="header-subtle-badge header-terminal-badge"
             title={`Active Device: ${terminalInfo?.name || 'PC Terminal'}`}
           >
             {terminalInfo?.isMobile ? <Smartphone size={12} /> : <Laptop size={12} />}

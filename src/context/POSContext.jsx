@@ -65,7 +65,16 @@ export const POSContext = createContext(null);
 
 export function POSProvider({ children }) {
   // Navigation View: 'billing' | 'sales' | 'products' | 'settings'
-  const [currentView, setCurrentView] = useState('billing');
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view');
+      if (v && ['billing', 'history', 'reports', 'sales', 'products', 'settings'].includes(v)) {
+        return v;
+      }
+    }
+    return 'billing';
+  });
 
   // Authentication & Role-based permissions
   // Roles: 'cashier' | 'admin'
@@ -81,7 +90,25 @@ export function POSProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   // Active Bill State
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkout') === 'true') {
+        return [{
+          id: 'item_sample_shirt',
+          productId: 'prod_shirts',
+          name: 'Shirts',
+          qty: 2,
+          unitPrice: 500,
+          originalUnitPrice: 500,
+          lineTotal: 1000,
+          reductionPerUnit: 0,
+          piecesPerUnit: 1,
+        }];
+      }
+    }
+    return [];
+  });
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [appliedComboDecisions, setAppliedComboDecisions] = useState({});
@@ -91,7 +118,13 @@ export function POSProvider({ children }) {
   const [isLoadingBills, setIsLoadingBills] = useState(true);
 
   // Modals
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('checkout') === 'true';
+    }
+    return false;
+  });
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
