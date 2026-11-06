@@ -17,19 +17,20 @@ import {
   collection,
   getDocs,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
 import { getDB } from './db';
 
-// Safely read Firebase configuration from environment
+// Safely read Firebase configuration from environment with permanent production fallback
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCdhEIUN67N60XHn3JmLhRCZUxNqFhA98c',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'festival-a21f4.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'festival-a21f4',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'festival-a21f4.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '180763761780',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:180763761780:web:14ee9a26aad93e8a79c871',
 };
 
 export function isFirebaseConfigured() {
@@ -389,6 +390,58 @@ export function subscribeFirestoreBills(onBillsUpdated) {
   } catch (err) {
     console.warn('Failed to attach Firestore live listener:', err);
     return () => {};
+  }
+}
+
+/**
+ * Uploads a single bill directly to Firestore
+ */
+export async function uploadSingleBillToFirestore(bill) {
+  if (!firestoreDb) return { success: false, reason: 'Firestore not configured' };
+  try {
+    const billKey = bill.billNumber || bill.id;
+    const docRef = doc(firestoreDb, 'sales_bills', billKey);
+    const cleanData = sanitizeForFirestore({
+      ...bill,
+      syncStatus: 'synced',
+      syncedAt: new Date().toISOString(),
+    });
+    await setDoc(docRef, cleanData, { merge: true });
+    return { success: true, billKey };
+  } catch (err) {
+    console.warn('Direct upload error for bill:', bill?.billNumber, err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Updates an existing bill document in Firestore
+ */
+export async function updateBillInFirestore(billKey, updates) {
+  if (!firestoreDb) return false;
+  try {
+    const docRef = doc(firestoreDb, 'sales_bills', billKey);
+    const cleanUpdates = sanitizeForFirestore(updates);
+    await updateDoc(docRef, cleanUpdates);
+    return true;
+  } catch (err) {
+    console.warn('Firestore update bill error:', billKey, err);
+    return false;
+  }
+}
+
+/**
+ * Deletes a bill document from Firestore
+ */
+export async function deleteBillFromFirestore(billKey) {
+  if (!firestoreDb) return false;
+  try {
+    const docRef = doc(firestoreDb, 'sales_bills', billKey);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn('Firestore delete bill error:', billKey, err);
+    return false;
   }
 }
 

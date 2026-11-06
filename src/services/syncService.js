@@ -2,9 +2,21 @@
 // Local-First IndexedDB architecture with status reporting for central cloud synchronization
 import { getDB, getAllBills } from './db';
 import { getTerminalId, getTerminalType } from './terminal';
-import { isFirebaseConfigured, syncBillsWithFirestore, subscribeFirestoreBills } from './firebase';
+import {
+  isFirebaseConfigured,
+  syncBillsWithFirestore,
+  subscribeFirestoreBills,
+  uploadSingleBillToFirestore,
+  updateBillInFirestore,
+  deleteBillFromFirestore,
+} from './firebase';
 
-export { subscribeFirestoreBills };
+export {
+  subscribeFirestoreBills,
+  uploadSingleBillToFirestore,
+  updateBillInFirestore,
+  deleteBillFromFirestore,
+};
 
 let isSyncInProgress = false;
 let currentSyncStatus = 'unconfigured'; // 'unconfigured' | 'synced' | 'syncing' | 'offline' | 'pending'
@@ -101,18 +113,26 @@ export async function syncWithBackend() {
 
     // Merge remote bills from other devices into local IndexedDB
     for (const rb of remoteBills) {
-      const exists = localBills.some((lb) => lb.billNumber === rb.billNumber || lb.id === rb.id);
-      if (!exists) {
+      const match = localBills.find((lb) => (lb.billNumber && rb.billNumber && lb.billNumber === rb.billNumber) || (lb.id && rb.id && lb.id === rb.id));
+      if (!match) {
         const safeBill = {
           ...rb,
           id: rb.id || rb.billNumber,
           syncStatus: 'synced',
         };
         await db.put('bills', safeBill);
+      } else {
+        const updated = {
+          ...match,
+          ...rb,
+          id: match.id || rb.id || rb.billNumber,
+          syncStatus: 'synced',
+        };
+        await db.put('bills', updated);
       }
     }
 
-    // Mark all local bills as synced
+    // Mark all local bills as synced in local IndexedDB
     const tx = db.transaction('bills', 'readwrite');
     for (const b of localBills) {
       if (b.syncStatus !== 'synced') {
@@ -121,16 +141,17 @@ export async function syncWithBackend() {
     }
     await tx.done;
 
-    pendingCount = 0;
-    currentSyncStatus = 'synced';
+    const freshBills = await db.getAll('bills');
+    pendingCount = freshBills.filter((b) => b.syncStatus !== 'synced').length;
+    currentSyncStatus = pendingCount > 0 ? 'pending' : 'synced';
     lastSyncTimestamp = new Date().toISOString();
-    lastSyncMessage = `Synchronised with Central Database! (${syncedCount} bills uploaded)`;
+    lastSyncMessage = `Synchronised with Central Database! (${syncedCount} bills uploaded, ${remoteBills.length} total cloud bills)`;
     notifyListeners();
 
     return {
       success: true,
       status: 'success',
-      message: `Cross-device sync complete! (${syncedCount} uploaded)`,
+      message: `Cross-device sync complete! (${syncedCount} uploaded, ${remoteBills.length} total)`,
     };
   } catch (err) {
     console.warn('Central sync error:', err);

@@ -44,6 +44,9 @@ import {
   subscribeSyncStatus,
   getSyncState,
   subscribeFirestoreBills,
+  uploadSingleBillToFirestore,
+  updateBillInFirestore,
+  deleteBillFromFirestore,
 } from '../services/syncService';
 import {
   isFirebaseConfigured,
@@ -260,6 +263,8 @@ export function POSProvider({ children }) {
 
   // Initialize Data
   useEffect(() => {
+    let unsubscribeFirestore = () => {};
+
     async function init() {
       try {
         await seedInitialDataIfEmpty();
@@ -271,32 +276,36 @@ export function POSProvider({ children }) {
         setProducts(loadedProducts);
         setIsLoadingProducts(false);
 
-        const loadedBills = await getAllBills();
-        setAllBills(loadedBills);
+        // 1. Fast initial render from local IndexedDB cache
+        const localBills = await getAllBills();
+        setAllBills(localBills);
         setIsLoadingBills(false);
 
-        // Start background cross-device synchronisation (triggers immediate sync on startup)
-        startBackgroundSync(async () => {
-          const refreshed = await getAllBills();
-          setAllBills(refreshed);
-        });
-
-        // Connect real-time Firestore listener for live PC ⇄ Mobile synchronization
+        // 2. Perform immediate shared cloud synchronization
         if (isFirebaseConfigured()) {
-          const unsubscribe = subscribeFirestoreBills(async (remoteBills) => {
+          try {
+            await syncWithBackend();
+            const syncedBills = await getAllBills();
+            setAllBills(syncedBills);
+          } catch (syncErr) {
+            console.warn('Initial cloud synchronization notice:', syncErr);
+          }
+
+          // 3. Connect real-time Firestore listener for live PC ⇄ Mobile synchronization
+          unsubscribeFirestore = subscribeFirestoreBills(async (remoteBills) => {
             if (!remoteBills || remoteBills.length === 0) return;
             try {
               const db = await getDB();
+              const currentLocal = await db.getAll('bills');
               let changed = false;
+
               for (const rb of remoteBills) {
-                let existing = null;
-                if (rb.id) {
-                  try { existing = await db.get('bills', rb.id); } catch (_) {}
-                }
-                if (!existing && rb.billNumber) {
-                  try { existing = await db.getFromIndex('bills', 'billNumber', rb.billNumber); } catch (_) {}
-                }
-                if (!existing) {
+                const match = currentLocal.find(
+                  (lb) => (lb.billNumber && rb.billNumber && lb.billNumber === rb.billNumber) ||
+                          (lb.id && rb.id && lb.id === rb.id)
+                );
+
+                if (!match) {
                   const safeBill = {
                     ...rb,
                     id: rb.id || rb.billNumber,
@@ -304,8 +313,18 @@ export function POSProvider({ children }) {
                   };
                   await db.put('bills', safeBill);
                   changed = true;
+                } else if (match.status !== rb.status || match.syncStatus !== 'synced') {
+                  const safeBill = {
+                    ...match,
+                    ...rb,
+                    id: match.id || rb.id || rb.billNumber,
+                    syncStatus: 'synced',
+                  };
+                  await db.put('bills', safeBill);
+                  changed = true;
                 }
               }
+
               if (changed) {
                 const updated = await getAllBills();
                 setAllBills(updated);
@@ -314,10 +333,6 @@ export function POSProvider({ children }) {
               console.warn('Real-time bills update notice:', err);
             }
           });
-
-          return () => {
-            unsubscribe();
-          };
         }
       } catch (err) {
         console.error('Initialization error:', err);
@@ -326,7 +341,12 @@ export function POSProvider({ children }) {
         setIsLoadingBills(false);
       }
     }
+
     init();
+
+    return () => {
+      unsubscribeFirestore();
+    };
   }, [showToast]);
 
   // Billing calculation engine including combos and item-level reductions
@@ -745,7 +765,7 @@ export function POSProvider({ children }) {
 
         const nextSeq = await getNextBillSequence();
         const billNumber = generateBillNumber(nextSeq);
-        const billId = `bill_${Date.now()}_${nextSeq}`;
+        const billId = `bill_${(terminalInfo.terminalType || 'pc').toLowerCase()}_${Date.now()}_${nextSeq}_${Math.random().toString(36).substr(2, 5)}`;
 
         const finalizedBill = {
           id: billId,
@@ -809,8 +829,22 @@ export function POSProvider({ children }) {
         setBillToPrint(savedBill);
         await refreshBills();
 
-        // Background Step 1: Immediately sync with central Neon PostgreSQL
-        syncWithBackend().catch((e) => console.warn('Background sync trigger:', e));
+        // Step 3: Immediately upload to Firestore shared cloud database
+        if (isFirebaseConfigured()) {
+          uploadSingleBillToFirestore(savedBill).then(async (res) => {
+            if (res?.success) {
+              await updateBillStatus(savedBill.id, {
+                syncStatus: 'synced',
+                syncedAt: new Date().toISOString(),
+              });
+              await refreshBills();
+            } else {
+              console.warn('Bill cloud write queued locally:', savedBill.billNumber);
+            }
+          }).catch((err) => {
+            console.warn('Bill cloud sync queued locally:', savedBill.billNumber, err);
+          });
+        }
 
         // Background Step 2: Optional Google Drive upload ONLY if explicitly checked
         const shouldUploadDrive = paymentDetails.alsoUploadToDrive !== undefined
@@ -980,6 +1014,15 @@ export function POSProvider({ children }) {
 
       try {
         const updated = await cancelBillInDB(billId, reason, userRole, currentUserName);
+        if (isFirebaseConfigured() && updated) {
+          const billKey = updated.billNumber || updated.id;
+          updateBillInFirestore(billKey, {
+            status: 'cancelled',
+            cancelReason: reason,
+            cancelledAt: new Date().toISOString(),
+            cancelledBy: currentUserName,
+          }).catch((e) => console.warn('Firestore cancel bill update:', e));
+        }
         await refreshBills();
         showToast(`Bill ${updated.billNumber} cancelled with audit trail.`, 'warning');
         return updated;
@@ -1000,7 +1043,12 @@ export function POSProvider({ children }) {
       }
 
       try {
+        const bill = allBills.find((b) => b.id === billId);
+        const billKey = bill?.billNumber || billId;
         await deleteBillInDB(billId, userRole, currentUserName);
+        if (isFirebaseConfigured()) {
+          deleteBillFromFirestore(billKey).catch((e) => console.warn('Firestore delete bill:', e));
+        }
         await refreshBills();
         showToast('Bill deleted permanently from database.', 'success');
         return true;
@@ -1009,7 +1057,7 @@ export function POSProvider({ children }) {
         return false;
       }
     },
-    [isAdmin, userRole, currentUserName, refreshBills, showToast]
+    [isAdmin, allBills, userRole, currentUserName, refreshBills, showToast]
   );
 
   // Role switching with pending navigation target resolution

@@ -56,6 +56,10 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     isAdmin,
     setIsAdminAuthModalOpen,
     settings,
+    syncState,
+    triggerManualSync,
+    isFirebaseConfigured,
+    terminalInfo,
   } = usePOS();
 
   const [activeViewMode, setActiveViewMode] = useState(defaultTab); // 'history' | 'reports'
@@ -432,21 +436,54 @@ export function SalesReportsView({ defaultTab = 'history' }) {
         </button>
       </div>
 
-      {/* Prominent Local-First Storage Notice Banner */}
+      {/* Cloud Synchronisation & Local-First Cache Status Banner */}
       <div className="local-storage-reminder-banner">
-        <Database size={18} className="banner-icon" />
+        {syncState?.status === 'syncing' ? (
+          <RotateCcw size={18} className="banner-icon spinning" style={{ color: '#0284c7' }} />
+        ) : (syncState?.pendingCount || 0) > 0 ? (
+          <Cloud size={18} className="banner-icon" style={{ color: '#f59e0b' }} />
+        ) : isFirebaseConfigured ? (
+          <CheckCircle2 size={18} className="banner-icon" style={{ color: '#16a34a' }} />
+        ) : (
+          <Database size={18} className="banner-icon" />
+        )}
         <div className="banner-text">
-          <strong>Local-First Storage Active:</strong> Bills are securely saved in this device's browser database (IndexedDB). Google Drive manual backups and JSON export preserve records permanently.
+          {isFirebaseConfigured ? (
+            <>
+              <strong>Shared Cloud Database Active:</strong> PC and Mobile terminals synchronise sales in real-time via Cloud Firestore (collection: <code>sales_bills</code>). Local IndexedDB serves as the offline-first cache so billing never stops.
+              {(syncState?.pendingCount || 0) > 0 && (
+                <span style={{ display: 'block', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
+                  ⏳ {syncState.pendingCount} bill(s) pending sync to cloud database.
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <strong>Local-First Storage Active:</strong> Bills are securely saved in this device's browser database (IndexedDB). Central cloud database is operating in local fallback mode.
+            </>
+          )}
         </div>
-        <button
-          type="button"
-          className="btn-backup-banner-action"
-          onClick={handleExportFullBackup}
-          title="Download complete database backup JSON"
-        >
-          <Download size={14} />
-          <span>Backup JSON</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-backup-banner-action"
+            onClick={triggerManualSync}
+            title="Sync all sales now with central database"
+            disabled={syncState?.status === 'syncing'}
+          >
+            <RotateCcw size={13} className={syncState?.status === 'syncing' ? 'spinning' : ''} />
+            <span>{syncState?.status === 'syncing' ? 'Syncing...' : 'Sync Now'}</span>
+          </button>
+          <button
+            type="button"
+            className="btn-backup-banner-action"
+            onClick={handleExportFullBackup}
+            title="Download complete database backup JSON"
+          >
+            <Download size={13} />
+            <span>Backup JSON</span>
+          </button>
+        </div>
       </div>
 
       {/* ====================================================================
