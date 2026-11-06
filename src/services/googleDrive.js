@@ -15,8 +15,10 @@ const FOLDER_CACHE_KEY = 'wisdo_gdrive_folders_v2';
 // Primary Root Folder in Google Drive (User designated: 'FESTIVAL SALES BILL')
 export const ROOT_DRIVE_FOLDER_NAME = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER || 'FESTIVAL SALES BILL';
 
-// Default / fallback Google Client ID (can be overridden in settings or .env)
-const DEFAULT_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+// Default / fallback Google Client ID (configured for Festival Clothing)
+const DEFAULT_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  '1016904752396-hml53gmsol15v9rh6jes43sugq2n684p.apps.googleusercontent.com';
 
 /**
  * Loads the official Google Identity Services script dynamically if not present
