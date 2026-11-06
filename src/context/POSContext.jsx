@@ -43,6 +43,7 @@ import {
   stopBackgroundSync,
   subscribeSyncStatus,
   getSyncState,
+  subscribeFirestoreBills,
 } from '../services/syncService';
 import {
   isFirebaseConfigured,
@@ -274,11 +275,50 @@ export function POSProvider({ children }) {
         setAllBills(loadedBills);
         setIsLoadingBills(false);
 
-        // Start background cross-device synchronisation
+        // Start background cross-device synchronisation (triggers immediate sync on startup)
         startBackgroundSync(async () => {
           const refreshed = await getAllBills();
           setAllBills(refreshed);
         });
+
+        // Connect real-time Firestore listener for live PC ⇄ Mobile synchronization
+        if (isFirebaseConfigured()) {
+          const unsubscribe = subscribeFirestoreBills(async (remoteBills) => {
+            if (!remoteBills || remoteBills.length === 0) return;
+            try {
+              const db = await getDB();
+              let changed = false;
+              for (const rb of remoteBills) {
+                let existing = null;
+                if (rb.id) {
+                  try { existing = await db.get('bills', rb.id); } catch (_) {}
+                }
+                if (!existing && rb.billNumber) {
+                  try { existing = await db.getFromIndex('bills', 'billNumber', rb.billNumber); } catch (_) {}
+                }
+                if (!existing) {
+                  const safeBill = {
+                    ...rb,
+                    id: rb.id || rb.billNumber,
+                    syncStatus: 'synced',
+                  };
+                  await db.put('bills', safeBill);
+                  changed = true;
+                }
+              }
+              if (changed) {
+                const updated = await getAllBills();
+                setAllBills(updated);
+              }
+            } catch (err) {
+              console.warn('Real-time bills update notice:', err);
+            }
+          });
+
+          return () => {
+            unsubscribe();
+          };
+        }
       } catch (err) {
         console.error('Initialization error:', err);
         showToast('Initialization issue: ' + err.message, 'error');

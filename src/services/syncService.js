@@ -2,7 +2,9 @@
 // Local-First IndexedDB architecture with status reporting for central cloud synchronization
 import { getDB, getAllBills } from './db';
 import { getTerminalId, getTerminalType } from './terminal';
-import { isFirebaseConfigured, syncBillsWithFirestore } from './firebase';
+import { isFirebaseConfigured, syncBillsWithFirestore, subscribeFirestoreBills } from './firebase';
+
+export { subscribeFirestoreBills };
 
 let isSyncInProgress = false;
 let currentSyncStatus = 'unconfigured'; // 'unconfigured' | 'synced' | 'syncing' | 'offline' | 'pending'
@@ -101,7 +103,12 @@ export async function syncWithBackend() {
     for (const rb of remoteBills) {
       const exists = localBills.some((lb) => lb.billNumber === rb.billNumber || lb.id === rb.id);
       if (!exists) {
-        await db.put('bills', { ...rb, syncStatus: 'synced' });
+        const safeBill = {
+          ...rb,
+          id: rb.id || rb.billNumber,
+          syncStatus: 'synced',
+        };
+        await db.put('bills', safeBill);
       }
     }
 
@@ -139,16 +146,37 @@ export async function syncWithBackend() {
   }
 }
 
-export function startPeriodicSync() {
-  refreshSyncQueueStatus();
-  if (typeof window !== 'undefined') {
-    window.addEventListener('online', refreshSyncQueueStatus);
-    window.addEventListener('offline', refreshSyncQueueStatus);
+export function startPeriodicSync(onSyncComplete) {
+  if (isFirebaseConfigured()) {
+    syncWithBackend().then(() => {
+      if (onSyncComplete) onSyncComplete();
+    }).catch(console.warn);
+  } else {
+    refreshSyncQueueStatus();
   }
+
+  const handleOnline = () => {
+    refreshSyncQueueStatus();
+    if (isFirebaseConfigured()) {
+      syncWithBackend().then(() => {
+        if (onSyncComplete) onSyncComplete();
+      }).catch(console.warn);
+    }
+  };
+
+  const handleOffline = () => {
+    refreshSyncQueueStatus();
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+  }
+
   return () => {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('online', refreshSyncQueueStatus);
-      window.removeEventListener('offline', refreshSyncQueueStatus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     }
   };
 }

@@ -75,9 +75,12 @@ export function SettingsView() {
     revokeStaff,
     changeStaffRole,
     isFirebaseConfigured,
+    syncState,
+    triggerManualSync,
+    terminalInfo,
   } = usePOS();
 
-  // Active sub-tab inside Admin Settings: 'shop' | 'products' | 'combos' | 'discounts' | 'gdrive' | 'receipt' | 'admin'
+  // Active sub-tab inside Admin Settings: 'shop' | 'products' | 'combos' | 'staff' | 'gdrive' | 'sync' | 'receipt'
   const [activeTab, setActiveTab] = useState('shop');
 
   // Form State with deep fallback
@@ -462,39 +465,15 @@ export function SettingsView() {
           onClick={() => setActiveTab('products')}
         >
           <Tags size={16} />
-          <span>Products & Prices</span>
+          <span>Product & Pricing</span>
         </button>
         <button
           type="button"
-          className={`settings-nav-pill ${activeTab === 'combos' ? 'active' : ''}`}
+          className={`settings-nav-pill ${activeTab === 'combos' || activeTab === 'discounts' ? 'active' : ''}`}
           onClick={() => setActiveTab('combos')}
         >
           <Layers size={16} />
-          <span>Combo Rules</span>
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'discounts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('discounts')}
-        >
-          <Percent size={16} />
-          <span>Item Reductions</span>
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'gdrive' ? 'active' : ''}`}
-          onClick={() => setActiveTab('gdrive')}
-        >
-          <Cloud size={16} />
-          <span>Google Drive Cloud</span>
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'receipt' ? 'active' : ''}`}
-          onClick={() => setActiveTab('receipt')}
-        >
-          <Printer size={16} />
-          <span>Receipt & Printer</span>
+          <span>Offers & Combos</span>
         </button>
         <button
           type="button"
@@ -502,15 +481,31 @@ export function SettingsView() {
           onClick={() => setActiveTab('staff')}
         >
           <Users size={16} />
-          <span>Staff Accounts</span>
+          <span>Staff Management</span>
         </button>
         <button
           type="button"
-          className={`settings-nav-pill ${activeTab === 'admin' ? 'active' : ''}`}
-          onClick={() => setActiveTab('admin')}
+          className={`settings-nav-pill ${activeTab === 'gdrive' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gdrive')}
+        >
+          <Cloud size={16} />
+          <span>Google Drive Backup</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'sync' || activeTab === 'admin' ? 'active' : ''}`}
+          onClick={() => setActiveTab('sync')}
         >
           <Database size={16} />
-          <span>Terminal & Database</span>
+          <span>Live Sync Status</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'receipt' ? 'active' : ''}`}
+          onClick={() => setActiveTab('receipt')}
+        >
+          <Printer size={16} />
+          <span>Receipt Settings</span>
         </button>
       </div>
 
@@ -784,7 +779,7 @@ export function SettingsView() {
       )}
 
       {/* SECTION 4: OFFERS & ITEM REDUCTION PERMISSIONS */}
-      {activeTab === 'discounts' && (
+      {(activeTab === 'combos' || activeTab === 'discounts') && (
         <ErrorBoundary title="Item Reductions Section">
           <div className="settings-section-card">
             <div className="card-header-row">
@@ -1045,14 +1040,91 @@ export function SettingsView() {
         </ErrorBoundary>
       )}
 
-      {/* SECTION 7: TERMINAL & DATABASE MANAGEMENT */}
-      {activeTab === 'admin' && (
-        <ErrorBoundary title="Terminal & Database Section">
+      {/* SECTION 6: LIVE SYNC & DATABASE MANAGEMENT */}
+      {(activeTab === 'sync' || activeTab === 'admin') && (
+        <ErrorBoundary title="Live Sync & Database Section">
           <div className="settings-section-card">
-            <div className="card-header-row">
+            <div className="card-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Database size={22} className="card-icon" />
-                <h3 className="card-title">Terminal Registration & Database Management</h3>
+                <h3 className="card-title">Live Cross-Device Sync & Database Status</h3>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={triggerManualSync}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '6px 14px' }}
+                disabled={syncState?.status === 'syncing'}
+              >
+                <RotateCcw size={14} className={syncState?.status === 'syncing' ? 'spinning' : ''} />
+                <span>{syncState?.status === 'syncing' ? 'Syncing...' : 'Sync All Sales Now'}</span>
+              </button>
+            </div>
+
+            {/* Live Sync Status Diagnostic Card */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '12px',
+                padding: '16px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                marginBottom: '20px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Central Cloud Database
+                </div>
+                {isFirebaseConfigured ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontWeight: 700, fontSize: '0.9rem' }}>
+                    <CheckCircle2 size={16} style={{ color: '#16a34a' }} />
+                    <span>Firebase Firestore Active</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#b45309', fontWeight: 600, fontSize: '0.9rem' }}>
+                    <Info size={16} style={{ color: '#f59e0b' }} />
+                    <span>Local-First (Vercel sync ready)</span>
+                  </div>
+                )}
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
+                  Collection: <code>sales_bills</code>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Current Device Terminal
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a', fontWeight: 700, fontSize: '0.9rem' }}>
+                  {terminalInfo?.isMobile ? <Smartphone size={16} style={{ color: '#0369a1' }} /> : <Laptop size={16} style={{ color: '#059669' }} />}
+                  <span>{terminalInfo?.name || 'PC Terminal'} ({terminalInfo?.terminalType || 'PC'})</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
+                  ID: <code>{terminalInfo?.id?.slice(0, 16)}...</code>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Sync Status & Queue
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 700 }}>
+                  {syncState?.status === 'syncing' ? (
+                    <span style={{ color: '#0284c7' }}>Syncing with Cloud...</span>
+                  ) : (syncState?.pendingCount || 0) > 0 ? (
+                    <span style={{ color: '#d97706' }}>Pending ({syncState?.pendingCount} bills queued)</span>
+                  ) : syncState?.status === 'offline' ? (
+                    <span style={{ color: '#dc2626' }}>Offline (Queued locally)</span>
+                  ) : (
+                    <span style={{ color: '#16a34a' }}>All Bills Synchronised</span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
+                  Total saved bills: <strong>{allBills?.length || 0}</strong>
+                </div>
               </div>
             </div>
 

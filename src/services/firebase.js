@@ -18,6 +18,7 @@ import {
   getDocs,
   updateDoc,
   serverTimestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { getDB } from './db';
 
@@ -304,6 +305,23 @@ export async function changeStaffMemberRole(email, newRole, updatedBy = 'Admin')
 // ----------------------------------------------------------------------------
 
 /**
+ * Recursively cleans an object for Firestore to avoid undefined field errors
+ */
+function sanitizeForFirestore(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
+
+  const clean = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      clean[key] = (typeof val === 'object' && val !== null) ? sanitizeForFirestore(val) : val;
+    }
+  }
+  return clean;
+}
+
+/**
  * Synchronizes local bills with Firestore sales_bills collection
  */
 export async function syncBillsWithFirestore(localBills) {
@@ -317,15 +335,12 @@ export async function syncBillsWithFirestore(localBills) {
     try {
       const billKey = b.billNumber || b.id;
       const docRef = doc(firestoreDb, 'sales_bills', billKey);
-      await setDoc(
-        docRef,
-        {
-          ...b,
-          syncStatus: 'synced',
-          syncedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      const cleanData = sanitizeForFirestore({
+        ...b,
+        syncStatus: 'synced',
+        syncedAt: new Date().toISOString(),
+      });
+      await setDoc(docRef, cleanData, { merge: true });
     } catch (e) {
       console.warn('Failed to upload bill to Firestore:', b.billNumber, e);
     }
@@ -346,6 +361,35 @@ export async function syncBillsWithFirestore(localBills) {
     syncedCount: unSynced.length,
     remoteBills,
   };
+}
+
+/**
+ * Subscribes to real-time sales_bills updates from Firestore
+ * Whenever any device (PC or mobile) creates or cancels a bill,
+ * this listener fires immediately!
+ */
+export function subscribeFirestoreBills(onBillsUpdated) {
+  if (!firestoreDb) return () => {};
+
+  try {
+    const billsCol = collection(firestoreDb, 'sales_bills');
+    return onSnapshot(
+      billsCol,
+      (snapshot) => {
+        const bills = [];
+        snapshot.forEach((docSnap) => {
+          bills.push(docSnap.data());
+        });
+        onBillsUpdated(bills);
+      },
+      (err) => {
+        console.warn('Firestore real-time listener notice:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to attach Firestore live listener:', err);
+    return () => {};
+  }
 }
 
 export async function signInWithGoogle() {
