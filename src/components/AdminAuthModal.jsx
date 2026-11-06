@@ -8,6 +8,7 @@ export function AdminAuthModal() {
     isAdminAuthModalOpen,
     setIsAdminAuthModalOpen,
     loginAsAdmin,
+    setPendingNavTarget,
   } = usePOS();
 
   const [pin, setPin] = useState('');
@@ -15,6 +16,7 @@ export function AdminAuthModal() {
 
   const handleClose = () => {
     setIsAdminAuthModalOpen(false);
+    if (setPendingNavTarget) setPendingNavTarget(null);
     setPin('');
     setErrorMsg('');
   };

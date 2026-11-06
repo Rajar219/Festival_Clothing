@@ -12,6 +12,7 @@ import { SalesReportsView } from './components/SalesReportsView';
 import { ProductManagementView } from './components/ProductManagementView';
 import { SettingsView } from './components/SettingsView';
 import { ReceiptPrintView } from './components/ReceiptPrintView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { COMPANY_BRANDING } from './services/db';
 import { AlertCircle, CheckCircle, Info, Sparkles } from 'lucide-react';
 
@@ -31,30 +32,32 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="pos-main-container">
-        {currentView === 'billing' && (
-          <div className="billing-desk-layout">
-            {/* Left Column: Product Selection & Current Bill Table */}
-            <div className="billing-main-column">
-              <QuickProductSelector />
-              <BillingTable />
+        <ErrorBoundary title="Application View">
+          {currentView === 'billing' && (
+            <div className="billing-desk-layout">
+              {/* Left Column: Product Selection & Current Bill Table */}
+              <div className="billing-main-column">
+                <QuickProductSelector />
+                <BillingTable />
+              </div>
+
+              {/* Right Column: Checkout Summary & Payment Dock */}
+              <div className="billing-side-column">
+                <BillSummary />
+              </div>
             </div>
+          )}
 
-            {/* Right Column: Checkout Summary & Payment Dock */}
-            <div className="billing-side-column">
-              <BillSummary />
-            </div>
-          </div>
-        )}
+          {currentView === 'history' && <SalesReportsView defaultTab="history" />}
 
-        {currentView === 'history' && <SalesReportsView defaultTab="history" />}
+          {currentView === 'reports' && <SalesReportsView defaultTab="reports" />}
 
-        {currentView === 'reports' && <SalesReportsView defaultTab="reports" />}
+          {currentView === 'sales' && <SalesReportsView defaultTab="history" />}
 
-        {currentView === 'sales' && <SalesReportsView defaultTab="history" />}
+          {currentView === 'products' && <ProductManagementView />}
 
-        {currentView === 'products' && <ProductManagementView />}
-
-        {currentView === 'settings' && <SettingsView />}
+          {currentView === 'settings' && <SettingsView />}
+        </ErrorBoundary>
       </main>
 
       {/* Mandatory Official Company Footer */}

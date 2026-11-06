@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { usePOS } from '../context/POSContext';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   COMPANY_BRANDING,
   exportFullDatabaseBackup,
   importFullDatabaseBackup,
   exportProductsCSV,
   exportBillsSummaryCSV,
+  DEFAULT_SETTINGS,
 } from '../services/db';
 import {
+  getSavedDriveAuth,
+  ensureFolderStructure,
   uploadBackupToDrive,
   uploadCSVReportToDrive,
 } from '../services/googleDrive';
+import { DEFAULT_COMBOS } from '../utils/comboEngine';
+import { formatINR } from '../utils/currency';
 import {
   Settings,
   Store,
@@ -32,6 +38,15 @@ import {
   Smartphone,
   ExternalLink,
   Percent,
+  Tags,
+  Sliders,
+  Layers,
+  Edit2,
+  RotateCcw,
+  Check,
+  X,
+  UserCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export function SettingsView() {
@@ -40,8 +55,12 @@ export function SettingsView() {
     products,
     allBills,
     updateSettings,
+    updateProductDetails,
+    toggleProductStatus,
     isAdmin,
     setIsAdminAuthModalOpen,
+    setPendingNavTarget,
+    switchRoleToCashier,
     refreshBills,
     showToast,
     isDriveConnected,
@@ -49,28 +68,80 @@ export function SettingsView() {
     disconnectDrive,
   } = usePOS();
 
-  const [formData, setFormData] = useState({ ...settings });
+  // Active sub-tab inside Admin Settings: 'shop' | 'products' | 'combos' | 'discounts' | 'gdrive' | 'receipt' | 'admin'
+  const [activeTab, setActiveTab] = useState('shop');
+
+  // Form State with deep fallback
+  const [formData, setFormData] = useState(() => ({
+    ...DEFAULT_SETTINGS,
+    ...(settings || {}),
+  }));
+
   const [isSaving, setIsSaving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isConnectingDrive, setIsConnectingDrive] = useState(false);
   const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+  const [isTestingDrive, setIsTestingDrive] = useState(false);
+  const [driveTestMessage, setDriveTestMessage] = useState('');
+  const [lastDriveBackupTime, setLastDriveBackupTime] = useState(() => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      return localStorage.getItem('wisdo_last_drive_backup_time') || null;
+    }
+    return null;
+  });
+
+  // Product Editing inside Settings
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    defaultPrice: '',
+    offerPrice: '',
+    offersStr: '',
+    reductionEnabled: true,
+    isActive: true,
+  });
+
+  // Combos Editing State
+  const [combosConfig, setCombosConfig] = useState(() => {
+    return (settings && settings.combos) ? settings.combos : DEFAULT_COMBOS;
+  });
+  const [isSavingCombos, setIsSavingCombos] = useState(false);
 
   useEffect(() => {
-    setFormData({ ...settings });
+    if (settings) {
+      setFormData((prev) => ({
+        ...DEFAULT_SETTINGS,
+        ...prev,
+        ...settings,
+      }));
+      if (settings.combos) {
+        setCombosConfig(settings.combos);
+      }
+    }
   }, [settings]);
 
+  // Auth Guard
   if (!isAdmin) {
     return (
       <div className="admin-locked-container">
-        <ShieldAlert size={48} className="lock-alert-icon" />
-        <h2>Administrator Access Required</h2>
-        <p>You must be authenticated as an Administrator to change store details, manage backups, or configure Google Drive.</p>
+        <ShieldAlert size={56} className="lock-alert-icon" style={{ color: '#dc2626', marginBottom: '16px' }} />
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#064e3b', marginBottom: '8px' }}>
+          Administrator Authentication Required
+        </h2>
+        <p style={{ color: '#475569', maxWidth: '480px', lineHeight: 1.5, marginBottom: '20px' }}>
+          You must be authenticated as an Administrator to view and modify store configuration, product prices, discount permissions, and Google Drive integrations.
+        </p>
         <button
           type="button"
           className="btn-primary"
-          onClick={() => setIsAdminAuthModalOpen(true)}
+          onClick={() => {
+            if (setPendingNavTarget) setPendingNavTarget('settings');
+            setIsAdminAuthModalOpen(true);
+          }}
+          style={{ padding: '12px 24px', fontSize: '1rem', fontWeight: 700 }}
         >
-          Login as Administrator
+          <Lock size={18} />
+          <span>Login as Administrator (PIN: 1234)</span>
         </button>
       </div>
     );
@@ -84,11 +155,14 @@ export function SettingsView() {
     }));
   };
 
-  const handleSave = async (e) => {
+  const handleSaveSettings = async (e) => {
     e?.preventDefault();
     setIsSaving(true);
-    await updateSettings(formData);
-    setIsSaving(false);
+    try {
+      await updateSettings(formData);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const downloadFile = (content, filename, mimeType = 'application/json') => {
@@ -100,25 +174,33 @@ export function SettingsView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Full Database Backup
   const handleDownloadBackup = async () => {
     try {
       const jsonStr = await exportFullDatabaseBackup();
-      downloadFile(jsonStr, `FestivalClothing_FullBackup_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
-      showToast('Full database backup file (.json) downloaded successfully.', 'success');
+      downloadFile(
+        jsonStr,
+        `FestivalClothing_FullBackup_${new Date().toISOString().slice(0, 10)}.json`,
+        'application/json'
+      );
+      showToast('Full database backup (.json) downloaded successfully.', 'success');
     } catch (err) {
       showToast('Backup failed: ' + err.message, 'error');
     }
   };
 
-  // Upload Backup to Google Drive
+  // Upload Backup to Google Drive (Manual Only)
   const handleDriveBackupUpload = async () => {
     try {
       setIsUploadingToDrive(true);
       const jsonStr = await exportFullDatabaseBackup();
       const res = await uploadBackupToDrive(jsonStr);
+      const timestamp = new Date().toLocaleString('en-IN');
+      setLastDriveBackupTime(timestamp);
+      localStorage.setItem('wisdo_last_drive_backup_time', timestamp);
       showToast(`Daily backup uploaded to Google Drive (${res.folderName})!`, 'success');
     } catch (err) {
       showToast(`Drive backup error: ${err.message}`, 'error');
@@ -127,11 +209,11 @@ export function SettingsView() {
     }
   };
 
-  // Upload CSV Report to Google Drive
+  // Upload CSV Report to Google Drive (Manual Only)
   const handleDriveReportUpload = async () => {
     try {
       setIsUploadingToDrive(true);
-      const csv = exportBillsSummaryCSV(allBills, settings.shopName);
+      const csv = exportBillsSummaryCSV(allBills || [], settings?.shopName || 'FESTIVAL CLOTHING');
       const res = await uploadCSVReportToDrive(csv, 'BillsSummary');
       showToast(`Sales report CSV uploaded to Google Drive (${res.folderName})!`, 'success');
     } catch (err) {
@@ -141,11 +223,31 @@ export function SettingsView() {
     }
   };
 
+  // Test / Verify Google Drive connection & folder structure
+  const handleTestDriveFolders = async () => {
+    try {
+      setIsTestingDrive(true);
+      setDriveTestMessage('');
+      const folders = await ensureFolderStructure();
+      setDriveTestMessage('Verified! Root folder "FESTIVAL SALES BILL" and sub-folders exist in Drive.');
+      showToast('Google Drive folder structure verified successfully!', 'success');
+    } catch (err) {
+      setDriveTestMessage('Verification issue: ' + err.message);
+      showToast('Drive verification failed: ' + err.message, 'error');
+    } finally {
+      setIsTestingDrive(false);
+    }
+  };
+
   // Export Product Settings CSV
   const handleExportProductCatalogCSV = () => {
     try {
-      const csv = exportProductsCSV(products);
-      downloadFile(csv, `FestivalClothing_Products_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+      const csv = exportProductsCSV(products || []);
+      downloadFile(
+        csv,
+        `FestivalClothing_Products_${new Date().toISOString().slice(0, 10)}.csv`,
+        'text/csv;charset=utf-8;'
+      );
       showToast('Product settings CSV exported for Excel / Pandas.', 'success');
     } catch (err) {
       showToast('Export failed: ' + err.message, 'error');
@@ -165,7 +267,7 @@ export function SettingsView() {
         const result = await importFullDatabaseBackup(content);
         await refreshBills();
         showToast(
-          `Backup Restored! ${result.importedBillsCount} new bills imported (${result.skippedDuplicatesCount} existing duplicates preserved).`,
+          `Backup Restored! ${result.importedBillsCount} bills imported (${result.skippedDuplicatesCount} duplicates preserved).`,
           'success'
         );
       } catch (err) {
@@ -189,333 +291,474 @@ export function SettingsView() {
     }
   };
 
+  // Product Editing Handlers
+  const handleOpenEditProduct = (prod) => {
+    setEditingProduct(prod);
+    const offersArr = Array.isArray(prod.offers)
+      ? prod.offers
+      : prod.offerPrice
+      ? [prod.offerPrice]
+      : [];
+    setProductForm({
+      name: prod.name,
+      defaultPrice: String(prod.defaultPrice || ''),
+      offerPrice: prod.offerPrice !== null && prod.offerPrice !== undefined ? String(prod.offerPrice) : '',
+      offersStr: offersArr.join(', '),
+      reductionEnabled: prod.reductionEnabled !== false,
+      isActive: prod.isActive !== false,
+    });
+  };
+
+  const handleSaveProductModal = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const basePrice = parseFloat(productForm.defaultPrice);
+    if (isNaN(basePrice) || basePrice < 0) {
+      alert('Please enter a valid positive base price.');
+      return;
+    }
+
+    const offerPrice = productForm.offerPrice ? parseFloat(productForm.offerPrice) : null;
+    const rawOffers = productForm.offersStr
+      .split(',')
+      .map((s) => parseFloat(s.trim()))
+      .filter((n) => !isNaN(n) && n > 0);
+
+    const mergedOffers = Array.from(new Set([
+      ...(offerPrice ? [offerPrice] : []),
+      ...rawOffers,
+    ])).sort((a, b) => b - a);
+
+    try {
+      await updateProductDetails(editingProduct.id, {
+        name: productForm.name.trim() || editingProduct.name,
+        defaultPrice: basePrice,
+        offerPrice: offerPrice,
+        offers: mergedOffers,
+        reductionEnabled: productForm.reductionEnabled,
+        isActive: productForm.isActive,
+      });
+      setEditingProduct(null);
+      showToast(`Updated price settings for "${editingProduct.name}"`, 'success');
+    } catch (err) {
+      alert('Error updating product: ' + err.message);
+    }
+  };
+
+  // Combo Configuration Handlers
+  const handleComboPriceChange = (comboId, newOfferPrice) => {
+    const val = parseFloat(newOfferPrice);
+    setCombosConfig((prev) =>
+      prev.map((c) => (c.id === comboId ? { ...c, offerPrice: isNaN(val) ? 0 : val } : c))
+    );
+  };
+
+  const handleComboToggle = (comboId) => {
+    setCombosConfig((prev) =>
+      prev.map((c) => (c.id === comboId ? { ...c, enabled: !c.enabled } : c))
+    );
+  };
+
+  const handleSaveCombos = async () => {
+    setIsSavingCombos(true);
+    try {
+      await updateSettings({
+        ...settings,
+        combos: combosConfig,
+      });
+      showToast('Combo promotion rules updated successfully!', 'success');
+    } catch (err) {
+      showToast('Failed to save combos: ' + err.message, 'error');
+    } finally {
+      setIsSavingCombos(false);
+    }
+  };
+
+  const driveAuth = getSavedDriveAuth();
+
   return (
     <div className="settings-container">
+      {/* Page Header */}
       <div className="settings-page-header">
         <div className="settings-title-row">
-          <Settings size={26} className="settings-header-icon" />
+          <Settings size={28} className="settings-header-icon" />
           <div>
-            <h2 className="page-heading">Shop Configuration & Data Management</h2>
+            <h2 className="page-heading">Shop Administration & System Settings</h2>
             <p className="page-subheading">
-              Manage retail store profile, terminal designation (PC / Mobile), Google Drive backup, and CSV exports.
+              Manage store profile, product prices, combo promotions, discount rules, Google Drive backups, and receipt printing.
             </p>
           </div>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={switchRoleToCashier}
+            className="btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+            title="Lock Admin Mode and return to Cashier Desk"
+          >
+            <Lock size={15} />
+            <span>Lock / Exit Admin</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveSettings}
+            className="btn-primary btn-save-settings"
+            disabled={isSaving}
+          >
+            <Save size={18} />
+            <span>{isSaving ? 'Saving Changes...' : 'Save All Settings'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation Sub-Tabs */}
+      <div className="settings-tabs-nav" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '18px', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>
         <button
           type="button"
-          onClick={handleSave}
-          className="btn-primary btn-save-settings"
-          disabled={isSaving}
+          className={`settings-nav-pill ${activeTab === 'shop' ? 'active' : ''}`}
+          onClick={() => setActiveTab('shop')}
         >
-          <Save size={18} />
-          <span>{isSaving ? 'Saving Changes...' : 'Save Settings'}</span>
+          <Store size={16} />
+          <span>Shop Profile</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('products')}
+        >
+          <Tags size={16} />
+          <span>Products & Prices</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'combos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('combos')}
+        >
+          <Layers size={16} />
+          <span>Combo Rules</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'discounts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('discounts')}
+        >
+          <Percent size={16} />
+          <span>Item Reductions</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'gdrive' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gdrive')}
+        >
+          <Cloud size={16} />
+          <span>Google Drive Cloud</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'receipt' ? 'active' : ''}`}
+          onClick={() => setActiveTab('receipt')}
+        >
+          <Printer size={16} />
+          <span>Receipt & Printer</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'admin' ? 'active' : ''}`}
+          onClick={() => setActiveTab('admin')}
+        >
+          <Database size={16} />
+          <span>Terminal & Database</span>
         </button>
       </div>
 
-      <form onSubmit={handleSave} className="settings-grid">
-        {/* Device Registration & Terminal Designation Card */}
-        <div className="settings-card full-width">
-          <div className="card-header-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {formData.deviceType === 'MOBILE' ? <Smartphone size={20} className="card-icon" /> : <Laptop size={20} className="card-icon" />}
-              <h3 className="card-title">Terminal Device Identification (PC vs Mobile)</h3>
-            </div>
-            <span className="badge-payment">{formData.deviceType === 'MOBILE' ? 'MOBILE TERMINAL' : 'PC BILLING DESK'}</span>
-          </div>
-
-          <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px' }}>
-            Register this specific device as either the main shop PC or a floor mobile terminal. This determines which Google Drive folder (<code>PC BILLING/</code> or <code>MOBILE BILLING/</code>) finalized invoice PDFs are uploaded to.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '14px' }}>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                padding: '14px',
-                borderRadius: '8px',
-                border: `2px solid ${formData.deviceType === 'PC' ? '#059669' : '#e2e8f0'}`,
-                background: formData.deviceType === 'PC' ? '#f0fdf4' : '#ffffff',
-                cursor: 'pointer',
-              }}
-            >
-              <input
-                type="radio"
-                name="deviceType"
-                value="PC"
-                checked={formData.deviceType !== 'MOBILE'}
-                onChange={handleChange}
-                style={{ marginTop: '3px' }}
-              />
-              <div>
-                <strong style={{ color: '#064e3b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Laptop size={16} /> PC Terminal (Main Cash Counter)
-                </strong>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Invoices save locally on this PC and upload to Google Drive under <code>FESTIVAL SALES BILL / PC BILLING</code>.
-                </p>
+      {/* SECTION 1: SHOP INFORMATION */}
+      {activeTab === 'shop' && (
+        <ErrorBoundary title="Shop Profile Section">
+          <div className="settings-section-card">
+            <div className="card-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Store size={22} className="card-icon" />
+                <h3 className="card-title">Shop Branding & Store Details</h3>
               </div>
-            </label>
-
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                padding: '14px',
-                borderRadius: '8px',
-                border: `2px solid ${formData.deviceType === 'MOBILE' ? '#059669' : '#e2e8f0'}`,
-                background: formData.deviceType === 'MOBILE' ? '#f0fdf4' : '#ffffff',
-                cursor: 'pointer',
-              }}
-            >
-              <input
-                type="radio"
-                name="deviceType"
-                value="MOBILE"
-                checked={formData.deviceType === 'MOBILE'}
-                onChange={handleChange}
-                style={{ marginTop: '3px' }}
-              />
-              <div>
-                <strong style={{ color: '#064e3b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Smartphone size={16} /> Mobile Terminal (Sales Floor Handheld)
-                </strong>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Invoices save locally on this phone/tablet and upload to Google Drive under <code>FESTIVAL SALES BILL / MOBILE BILLING</code>.
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
-            ℹ️ <strong>Independent Sales Record Architecture:</strong> PC and mobile maintain separate, independent local IndexedDB databases on each device. Bills created on PC remain on PC; bills created on mobile remain on mobile. Both backup documents to Google Drive.
-          </div>
-        </div>
-
-        {/* Google Drive Integration Card */}
-        <div className="settings-card full-width">
-          <div className="card-header-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Cloud size={22} className="card-icon" style={{ color: '#0284c7' }} />
-              <h3 className="card-title">Google Drive Cloud Document Storage</h3>
             </div>
-            {isDriveConnected ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontWeight: 600, fontSize: '0.85rem' }}>
-                <CheckCircle2 size={16} /> Connected to Google Drive
-              </span>
-            ) : (
-              <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '0.85rem' }}>
-                Not Connected
-              </span>
-            )}
+
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px' }}>
+              Official shop details printed on A4 retail invoices, thermal receipts, and shared via WhatsApp.
+            </p>
+
+            <div className="settings-fields-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div className="form-group">
+                <label className="input-group-label">Active Retail Shop Name *</label>
+                <input
+                  type="text"
+                  name="shopName"
+                  className="form-control"
+                  value={formData.shopName || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. FESTIVAL CLOTHING"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="input-group-label">Category Subtitle / Tagline *</label>
+                <input
+                  type="text"
+                  name="subtitle"
+                  className="form-control"
+                  value={formData.subtitle || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. MENSWEAR"
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="input-group-label">Official Store Address *</label>
+                <textarea
+                  name="address"
+                  rows={2}
+                  className="form-control"
+                  value={formData.address || ''}
+                  onChange={handleChange}
+                  placeholder="No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu."
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="input-group-label">Contact Phone (Optional)</label>
+                <input
+                  type="text"
+                  name="phone"
+                  className="form-control"
+                  value={formData.phone || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. +91 98765 43210"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="input-group-label">UPI ID (For Digital Payments)</label>
+                <input
+                  type="text"
+                  name="upiId"
+                  className="form-control"
+                  value={formData.upiId || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. festivalclothing@okhdfcbank"
+                />
+              </div>
+            </div>
+
+            {/* Official WISDO TECH Protected Branding Banner */}
+            <div className="immutable-attribution-box" style={{ marginTop: '20px' }}>
+              <div className="immutable-header">
+                <Lock size={15} />
+                <strong>Official Product Engineering Attribution (Protected)</strong>
+              </div>
+              <p>
+                Engineered and maintained by <strong>{COMPANY_BRANDING.companyName}</strong>. The company attribution tag <em>"{COMPANY_BRANDING.attributionText}"</em> is permanently affixed to the application footer, invoices, and thermal receipts.
+              </p>
+            </div>
           </div>
+        </ErrorBoundary>
+      )}
 
-          <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '14px' }}>
-            Connect your shop's Google Drive account using Google OAuth 2.0 with restricted file-level permissions (<code>drive.file</code>). Once connected, the system automatically creates and maintains the following folder structure:
-          </p>
+      {/* SECTION 2: PRODUCT AND PRICE MANAGEMENT */}
+      {activeTab === 'products' && (
+        <ErrorBoundary title="Product Management Section">
+          <div className="settings-section-card">
+            <div className="card-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Tags size={22} className="card-icon" />
+                <h3 className="card-title">Product Catalog & Base Prices (Menswear)</h3>
+              </div>
+              <button
+                type="button"
+                className="btn-product-csv-action"
+                onClick={handleExportProductCatalogCSV}
+                style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              >
+                <FileSpreadsheet size={15} />
+                <span>Export CSV</span>
+              </button>
+            </div>
 
-          <pre style={{ background: '#0f172a', color: '#38bdf8', padding: '10px 14px', borderRadius: '6px', fontSize: '0.78rem', marginBottom: '16px' }}>
-            {`FESTIVAL SALES BILL/
-  ├── PC BILLING/        (Invoices generated on shop computer)
-  ├── MOBILE BILLING/    (Invoices generated on mobile devices)
-  ├── DAILY BACKUPS/     (Daily full JSON database snapshots)
-  └── SALES REPORTS/     (CSV sales ledgers for accounting & Excel)`}
-          </pre>
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '14px' }}>
+              Configure base selling prices, offer pricing options, and item active statuses for all retail items.
+            </p>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
-            {!isDriveConnected ? (
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table className="ledger-table" style={{ width: '100%', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th className="text-right">Default Base Price</th>
+                    <th className="text-right">Primary Offer</th>
+                    <th>Quick Offer Buttons</th>
+                    <th className="text-center">Reductions</th>
+                    <th className="text-center">Status</th>
+                    <th className="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(products || []).filter((p) => p.id !== 'prod_custom_item').map((prod) => (
+                    <tr key={prod.id}>
+                      <td>
+                        <strong>{prod.name}</strong>
+                      </td>
+                      <td className="text-right">₹{prod.defaultPrice}</td>
+                      <td className="text-right">
+                        {prod.offerPrice ? <span style={{ color: '#059669', fontWeight: 600 }}>₹{prod.offerPrice}</span> : '-'}
+                      </td>
+                      <td>
+                        {Array.isArray(prod.offers) && prod.offers.length > 0 ? (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {prod.offers.map((off, idx) => (
+                              <span key={idx} style={{ background: '#f0fdf4', color: '#064e3b', padding: '2px 6px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 600 }}>
+                                ₹{off}
+                              </span>
+                            ))}
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="text-center">
+                        {prod.reductionEnabled !== false ? (
+                          <span style={{ color: '#059669', fontSize: '0.8rem', fontWeight: 600 }}>Enabled</span>
+                        ) : (
+                          <span style={{ color: '#dc2626', fontSize: '0.8rem' }}>Disabled</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleProductStatus(prod.id)}
+                          style={{
+                            border: 'none',
+                            background: prod.isActive !== false ? '#dcfce7' : '#fee2e2',
+                            color: prod.isActive !== false ? '#15803d' : '#b91c1c',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {prod.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                        </button>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          className="btn-icon-action view"
+                          onClick={() => handleOpenEditProduct(prod)}
+                          title="Edit product price & offers"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {/* SECTION 3: COMBO RULES */}
+      {activeTab === 'combos' && (
+        <ErrorBoundary title="Combo Rules Section">
+          <div className="settings-section-card">
+            <div className="card-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Layers size={22} className="card-icon" />
+                <h3 className="card-title">Festival Combo Promotion Rules</h3>
+              </div>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={handleDriveConnectClick}
-                disabled={isConnectingDrive}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px' }}
+                onClick={handleSaveCombos}
+                disabled={isSavingCombos}
+                style={{ fontSize: '0.82rem', padding: '6px 14px' }}
               >
-                <Cloud size={18} />
-                <span>{isConnectingDrive ? 'Authorizing Google...' : 'Connect Google Drive'}</span>
+                <Save size={15} />
+                <span>{isSavingCombos ? 'Saving...' : 'Save Combo Rules'}</span>
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDriveBackupUpload}
-                  disabled={isUploadingToDrive}
-                  className="btn-backup-action"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Upload size={16} />
-                  <span>{isUploadingToDrive ? 'Uploading...' : 'Upload Daily Backup to Drive'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDriveReportUpload}
-                  disabled={isUploadingToDrive}
-                  className="btn-product-csv-action"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <FileSpreadsheet size={16} />
-                  <span>Upload Sales CSV to Drive</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={disconnectDrive}
-                  className="btn-secondary"
-                  style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                >
-                  Disconnect Google Drive
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="input-group-label" style={{ fontSize: '0.8rem' }}>
-              Custom Google OAuth 2.0 Web Client ID (Optional override)
-            </label>
-            <input
-              type="text"
-              name="googleClientId"
-              className="form-control"
-              value={formData.googleClientId || ''}
-              onChange={handleChange}
-              placeholder="e.g. 123456789-abc.apps.googleusercontent.com"
-              style={{ fontSize: '0.85rem' }}
-            />
-            <small className="field-hint">
-              By default uses <code>VITE_GOOGLE_CLIENT_ID</code> from environment. You can enter or update your Google Cloud OAuth Client ID here without re-deploying.
-            </small>
-          </div>
-        </div>
-
-        {/* Store Profile Card */}
-        <div className="settings-card">
-          <div className="card-header-row">
-            <Store size={20} className="card-icon" />
-            <h3 className="card-title">Shop Branding & Profile</h3>
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Active Retail Shop Name *</label>
-            <input
-              type="text"
-              name="shopName"
-              className="form-control"
-              value={formData.shopName || ''}
-              onChange={handleChange}
-              placeholder="e.g. FESTIVAL CLOTHING"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Category Subtitle / Tagline *</label>
-            <input
-              type="text"
-              name="subtitle"
-              className="form-control"
-              value={formData.subtitle || ''}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Store Address</label>
-            <textarea
-              name="address"
-              rows={2}
-              className="form-control"
-              value={formData.address || ''}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Store Contact Phone</label>
-            <input
-              type="text"
-              name="phone"
-              className="form-control"
-              value={formData.phone || ''}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">UPI ID (For Digital Checkout QR)</label>
-            <input
-              type="text"
-              name="upiId"
-              className="form-control"
-              value={formData.upiId || ''}
-              onChange={handleChange}
-            />
-          </div>
-        </div>
-
-        {/* Printing & Receipt Preferences */}
-        <div className="settings-card">
-          <div className="card-header-row">
-            <Printer size={20} className="card-icon" />
-            <h3 className="card-title">Receipt Printing & Preferences</h3>
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Default Printing Format</label>
-            <select
-              name="defaultPrintMode"
-              className="form-control"
-              value={formData.defaultPrintMode || 'thermal'}
-              onChange={handleChange}
-            >
-              <option value="thermal">Thermal POS Receipt (80mm / 3-inch roll)</option>
-              <option value="a4">Standard A4 / Letter Retail Invoice</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="input-group-label">Receipt Footer Message / Policy</label>
-            <textarea
-              name="receiptFooter"
-              rows={3}
-              className="form-control"
-              value={formData.receiptFooter || ''}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group toggle-group">
-            <label className="checkbox-container">
-              <input
-                type="checkbox"
-                name="autoPrintOnCheckout"
-                checked={!!formData.autoPrintOnCheckout}
-                onChange={handleChange}
-              />
-              <span className="checkmark" />
-              <span className="checkbox-label">
-                Automatically trigger printer prompt immediately after finalizing bill
-              </span>
-            </label>
-          </div>
-
-          {/* Item-Level Price Reduction Configuration */}
-          <div className="settings-card">
-            <div className="card-header-row">
-              <Percent size={20} className="card-icon" />
-              <h3 className="card-title">Item-Level Price Reduction Settings</h3>
             </div>
 
-            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
-              Configure individual item reductions (₹10 Less). Reductions apply strictly to specific items (never the bill subtotal) and protect against negative prices.
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px' }}>
+              Automatic combo savings evaluated in real time at checkout (e.g. 3 Shirts @ ₹1000). Cashiers can also manually toggle combos on/off per bill.
             </p>
 
-            <div className="form-group toggle-group">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+              {combosConfig.map((combo) => (
+                <div
+                  key={combo.id}
+                  style={{
+                    border: `2px solid ${combo.enabled ? '#059669' : '#e2e8f0'}`,
+                    borderRadius: '10px',
+                    padding: '14px',
+                    background: combo.enabled ? '#f0fdf4' : '#f8fafc',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <strong style={{ fontSize: '0.95rem', color: '#064e3b' }}>{combo.name}</strong>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <input
+                        type="checkbox"
+                        checked={combo.enabled}
+                        onChange={() => handleComboToggle(combo.id)}
+                      />
+                      <span>{combo.enabled ? 'Enabled' : 'Disabled'}</span>
+                    </label>
+                  </div>
+
+                  <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#475569' }}>
+                    Requires <strong>{combo.requiredQty} pcs</strong> of <em>{combo.productName || combo.name}</em>
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e293b' }}>Bundle Price:</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontWeight: 700, color: '#064e3b' }}>₹</span>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={combo.offerPrice}
+                        onChange={(e) => handleComboPriceChange(combo.id, e.target.value)}
+                        style={{ width: '100px', padding: '4px 8px', fontSize: '0.9rem', fontWeight: 700 }}
+                        min="0"
+                        step="50"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {/* SECTION 4: OFFERS & ITEM REDUCTION PERMISSIONS */}
+      {activeTab === 'discounts' && (
+        <ErrorBoundary title="Item Reductions Section">
+          <div className="settings-section-card">
+            <div className="card-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Percent size={22} className="card-icon" />
+                <h3 className="card-title">Item-Level Price Reduction Settings (₹10 Less)</h3>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px' }}>
+              Allows cashiers to click "₹10 Less" on individual items in the bill to quickly accommodate customer bargaining. Prevents negative rates and preserves full audit logs.
+            </p>
+
+            <div className="form-group toggle-group" style={{ marginBottom: '16px' }}>
               <label className="checkbox-container">
                 <input
                   type="checkbox"
@@ -524,13 +767,13 @@ export function SettingsView() {
                   onChange={handleChange}
                 />
                 <span className="checkmark" />
-                <span className="checkbox-label" style={{ fontWeight: 600 }}>
+                <span className="checkbox-label" style={{ fontWeight: 700, fontSize: '0.92rem' }}>
                   Enable Item-Level Price Reductions Store-Wide
                 </span>
               </label>
             </div>
 
-            <div className="form-row-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
               <div className="form-group">
                 <label className="input-group-label">Reduction Step Amount (₹)</label>
                 <input
@@ -542,11 +785,11 @@ export function SettingsView() {
                   value={formData.reductionStepAmount ?? 10}
                   onChange={handleChange}
                 />
-                <small className="field-hint">Amount in ₹ reduced per click (default ₹10).</small>
+                <small className="field-hint">Amount in ₹ deducted per click (default ₹10).</small>
               </div>
 
               <div className="form-group">
-                <label className="input-group-label">Max Reductions per Unit</label>
+                <label className="input-group-label">Maximum Reductions per Piece</label>
                 <input
                   type="number"
                   name="maxReductionsCount"
@@ -556,11 +799,11 @@ export function SettingsView() {
                   value={formData.maxReductionsCount ?? 5}
                   onChange={handleChange}
                 />
-                <small className="field-hint">e.g. 5 clicks = max ₹50 reduction per piece.</small>
+                <small className="field-hint">e.g. 5 clicks = max ₹50 reduction per unit.</small>
               </div>
             </div>
 
-            <div className="form-group toggle-group" style={{ marginTop: '8px' }}>
+            <div className="form-group toggle-group">
               <label className="checkbox-container">
                 <input
                   type="checkbox"
@@ -570,125 +813,437 @@ export function SettingsView() {
                 />
                 <span className="checkmark" />
                 <span className="checkbox-label" style={{ fontWeight: 600 }}>
-                  Allow Cashiers to apply reductions (if unchecked, requires Admin PIN)
+                  Allow Cashiers to apply reductions without Administrator PIN prompt
                 </span>
               </label>
             </div>
           </div>
+        </ErrorBoundary>
+      )}
 
-          {/* Immutable Official Company Branding Card */}
-          <div className="immutable-attribution-box">
-            <div className="immutable-header">
-              <Lock size={15} />
-              <strong>Official Product Branding (Protected)</strong>
+      {/* SECTION 5: GOOGLE DRIVE BACKUP */}
+      {activeTab === 'gdrive' && (
+        <ErrorBoundary title="Google Drive Cloud Section">
+          <div className="settings-section-card">
+            <div className="card-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cloud size={24} className="card-icon" style={{ color: '#0284c7' }} />
+                <h3 className="card-title">Google Drive Cloud Storage & Backups</h3>
+              </div>
+              {isDriveConnected ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <CheckCircle2 size={16} /> Connected to Google Drive
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#dc2626', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <XCircle size={16} /> Not Connected
+                </span>
+              )}
             </div>
-            <p>
-              Developed and maintained by <strong>{COMPANY_BRANDING.companyName}</strong>. The company attribution tag <em>"{COMPANY_BRANDING.attributionText}"</em> is permanently affixed to the application footer, receipts, and WhatsApp invoices.
+
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '14px' }}>
+              Connect your shop's Google account to archive bills, daily JSON database backups, and sales CSV ledgers. Google Drive uploads are <strong>MANUAL ONLY</strong> (no silent background uploads).
             </p>
-          </div>
-        </div>
 
-        {/* Local-First IndexedDB Database & Backup Management */}
-        <div className="settings-card full-width">
-          <div className="card-header-row">
-            <Database size={20} className="card-icon" />
-            <h3 className="card-title">Local-First Database & Backup Management</h3>
-          </div>
+            {/* Folder Structure Representation */}
+            <pre style={{ background: '#0f172a', color: '#38bdf8', padding: '12px 16px', borderRadius: '8px', fontSize: '0.8rem', marginBottom: '16px' }}>
+              {`FESTIVAL SALES BILL/
+  ├── PC BILLING/        (Invoices generated on shop computer)
+  ├── MOBILE BILLING/    (Invoices generated on mobile handhelds)
+  ├── DAILY BACKUPS/     (Daily full JSON database snapshots)
+  └── SALES REPORTS/     (CSV sales ledgers for accounting & Excel)`}
+            </pre>
 
-          <div className="backup-management-grid">
-            {/* Box 1: Full System Backup */}
-            <div className="backup-card-box highlight">
-              <div className="box-header">
-                <h4>Full System Backup (.JSON)</h4>
-                <span className="box-tag">Full Database Restore</span>
-              </div>
-              <p>
-                Exports all finalized bills, line items, product prices, settings, and audit logs to an encrypted local JSON file. <strong>Recommended at closing every evening during the Diwali rush.</strong>
-              </p>
-              <button
-                type="button"
-                className="btn-backup-action"
-                onClick={handleDownloadBackup}
-              >
-                <Download size={16} />
-                <span>Export System Backup (JSON)</span>
-              </button>
+            {/* Connection Actions */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+              {!isDriveConnected ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleDriveConnectClick}
+                  disabled={isConnectingDrive}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px' }}
+                >
+                  <Cloud size={18} />
+                  <span>{isConnectingDrive ? 'Authorizing Google...' : 'Connect Google Drive'}</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleTestDriveFolders}
+                    disabled={isTestingDrive}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Check size={16} />
+                    <span>{isTestingDrive ? 'Verifying...' : 'Test Connection & Folders'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDriveBackupUpload}
+                    disabled={isUploadingToDrive}
+                    className="btn-backup-action"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Upload size={16} />
+                    <span>{isUploadingToDrive ? 'Uploading...' : 'Upload Daily Backup to Drive'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDriveReportUpload}
+                    disabled={isUploadingToDrive}
+                    className="btn-product-csv-action"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>Upload Sales CSV to Drive</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={disconnectDrive}
+                    className="btn-secondary"
+                    style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                  >
+                    Disconnect Google Drive
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Box 2: Restore Database */}
-            <div className="backup-card-box">
-              <div className="box-header">
-                <h4>Restore / Import Database (.JSON)</h4>
-                <span className="box-tag">Duplicate-Safe</span>
+            {driveTestMessage && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '10px', borderRadius: '6px', fontSize: '0.85rem', color: '#064e3b', marginBottom: '14px' }}>
+                {driveTestMessage}
               </div>
-              <p>
-                Safely imports records from a previously exported backup file. Verifies structure, prevents overwriting existing bills, and records an audit log.
-              </p>
-              <label className="btn-restore-action">
-                <Upload size={16} />
-                <span>{isRestoring ? 'Restoring Records...' : 'Import Backup File (JSON)'}</span>
+            )}
+
+            {lastDriveBackupTime && (
+              <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '14px' }}>
+                🕒 <strong>Last Successful Drive Backup:</strong> {lastDriveBackupTime}
+              </div>
+            )}
+
+            {/* Custom Client ID Override */}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="input-group-label" style={{ fontSize: '0.8rem' }}>
+                Google OAuth 2.0 Web Client ID
+              </label>
+              <input
+                type="text"
+                name="googleClientId"
+                className="form-control"
+                value={formData.googleClientId || ''}
+                onChange={handleChange}
+                placeholder="e.g. 1016904752396-xxxx.apps.googleusercontent.com"
+                style={{ fontSize: '0.85rem' }}
+              />
+              <small className="field-hint">
+                Default configured for Festival Clothing. Can be overridden if creating a new Google Cloud project.
+              </small>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {/* SECTION 6: RECEIPT & INVOICE SETTINGS */}
+      {activeTab === 'receipt' && (
+        <ErrorBoundary title="Receipt & Printer Section">
+          <div className="settings-section-card">
+            <div className="card-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Printer size={22} className="card-icon" />
+                <h3 className="card-title">Receipt Printing & Invoice Settings</h3>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px' }}>
+              Configure invoice layout, policy notices, and browser print prompt defaults.
+            </p>
+
+            <div className="form-group">
+              <label className="input-group-label">Default Printing Format</label>
+              <select
+                name="defaultPrintMode"
+                className="form-control"
+                value={formData.defaultPrintMode || 'thermal'}
+                onChange={handleChange}
+              >
+                <option value="thermal">Thermal POS Receipt (Clean Monospace A4 Format)</option>
+                <option value="a4">Standard A4 / Letter Retail Invoice</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="input-group-label">Receipt Footer Exchange Policy / Message</label>
+              <textarea
+                name="receiptFooter"
+                rows={3}
+                className="form-control"
+                value={formData.receiptFooter || ''}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group toggle-group">
+              <label className="checkbox-container">
                 <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileRestore}
-                  style={{ display: 'none' }}
-                  disabled={isRestoring}
+                  type="checkbox"
+                  name="autoPrintOnCheckout"
+                  checked={!!formData.autoPrintOnCheckout}
+                  onChange={handleChange}
                 />
+                <span className="checkmark" />
+                <span className="checkbox-label">
+                  Automatically open browser printer dialog immediately after checkout save
+                </span>
               </label>
             </div>
+          </div>
+        </ErrorBoundary>
+      )}
 
-            {/* Box 3: Product Settings CSV */}
-            <div className="backup-card-box">
-              <div className="box-header">
-                <h4>Product Settings (.CSV)</h4>
-                <span className="box-tag">Excel & Pandas</span>
+      {/* SECTION 7: TERMINAL & DATABASE MANAGEMENT */}
+      {activeTab === 'admin' && (
+        <ErrorBoundary title="Terminal & Database Section">
+          <div className="settings-section-card">
+            <div className="card-header-row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Database size={22} className="card-icon" />
+                <h3 className="card-title">Terminal Registration & Database Management</h3>
               </div>
-              <p>
-                Exports current product catalog names, keyboard shortcuts, and default prices in UTF-8 CSV format for spreadsheet editing or Python Pandas analysis.
+            </div>
+
+            {/* Terminal Designation */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '0.95rem', color: '#1e293b' }}>
+                Device Terminal Designation
+              </h4>
+              <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                Register this specific device as either the main cash counter PC or a mobile handheld terminal.
               </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    border: `2px solid ${formData.deviceType === 'PC' ? '#059669' : '#e2e8f0'}`,
+                    background: formData.deviceType === 'PC' ? '#f0fdf4' : '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="deviceType"
+                    value="PC"
+                    checked={formData.deviceType !== 'MOBILE'}
+                    onChange={handleChange}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <div>
+                    <strong style={{ color: '#064e3b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Laptop size={16} /> PC Terminal (Main Cash Counter)
+                    </strong>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Saves locally and uploads to Google Drive under <code>PC BILLING/</code>.
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    border: `2px solid ${formData.deviceType === 'MOBILE' ? '#059669' : '#e2e8f0'}`,
+                    background: formData.deviceType === 'MOBILE' ? '#f0fdf4' : '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="deviceType"
+                    value="MOBILE"
+                    checked={formData.deviceType === 'MOBILE'}
+                    onChange={handleChange}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <div>
+                    <strong style={{ color: '#064e3b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Smartphone size={16} /> Mobile Terminal (Sales Floor Handheld)
+                    </strong>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Saves locally and uploads to Google Drive under <code>MOBILE BILLING/</code>.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Full Database Export & Restore */}
+            <div className="backup-management-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+              <div className="backup-card-box highlight" style={{ border: '1px solid #cbd5e1', padding: '16px', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 6px', color: '#064e3b' }}>Full System Backup (.JSON)</h4>
+                <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '12px' }}>
+                  Exports all saved bills, customer records, product prices, and audit logs to a local JSON file. Recommended at closing every evening.
+                </p>
+                <button
+                  type="button"
+                  className="btn-backup-action"
+                  onClick={handleDownloadBackup}
+                  style={{ width: '100%' }}
+                >
+                  <Download size={16} />
+                  <span>Export System Backup (JSON)</span>
+                </button>
+              </div>
+
+              <div className="backup-card-box" style={{ border: '1px solid #cbd5e1', padding: '16px', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 6px', color: '#1e293b' }}>Restore / Import Database (.JSON)</h4>
+                <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '12px' }}>
+                  Safely imports bills and settings from a previous backup without overwriting existing bills.
+                </p>
+                <label className="btn-restore-action" style={{ width: '100%', textAlign: 'center', display: 'block' }}>
+                  <Upload size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                  <span>{isRestoring ? 'Restoring...' : 'Import Backup File (JSON)'}</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileRestore}
+                    style={{ display: 'none' }}
+                    disabled={isRestoring}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Critical Data Storage Notice */}
+            <div
+              style={{
+                border: '2px solid #f59e0b',
+                background: '#fffbeb',
+                padding: '14px',
+                borderRadius: '8px',
+                color: '#92400e',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '6px' }}>
+                <AlertTriangle size={18} />
+                <span>CRITICAL LOCAL DATA NOTICE (WisdoFestivalPOS_DB)</span>
+              </div>
+              <p style={{ margin: '0 0 6px', lineHeight: 1.4 }}>
+                All transaction records are saved locally inside this browser's IndexedDB. To protect against accidental browser cache clearing or device loss, connect Google Drive or download a JSON backup at daily closing.
+              </p>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {/* Edit Product Price Modal */}
+      {editingProduct && (
+        <div className="modal-overlay" onClick={() => setEditingProduct(null)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Edit Price — {editingProduct.name}</h3>
               <button
                 type="button"
-                className="btn-product-csv-action"
-                onClick={handleExportProductCatalogCSV}
+                className="modal-close-btn"
+                onClick={() => setEditingProduct(null)}
               >
-                <FileSpreadsheet size={16} />
-                <span>Export Products CSV</span>
+                <X size={18} />
               </button>
             </div>
-          </div>
 
-          {/* CRITICAL LOCAL DATA WARNING BANNER */}
-          <div
-            className="single-computer-warning-card"
-            style={{
-              marginTop: '20px',
-              border: '2px solid #f59e0b',
-              background: '#fffbeb',
-              padding: '16px',
-              borderRadius: '8px',
-            }}
-          >
-            <div className="warning-card-header" style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertTriangle size={20} />
-              <strong style={{ fontSize: '0.95rem' }}>CRITICAL LOCAL DATA SAFETY WARNING (IndexedDB Architecture)</strong>
-            </div>
-            <ul className="storage-notes-list" style={{ color: '#92400e', marginTop: '10px', lineHeight: 1.5 }}>
-              <li>
-                <strong>Browser-Local Storage:</strong> All transaction records and bill histories are stored strictly inside this device's browser IndexedDB database (<code>WisdoFestivalPOS_DB</code>).
-              </li>
-              <li>
-                <strong>Risk of Data Loss:</strong> <u>Clearing browser cookies/site data, uninstalling the browser, browsing in incognito/private mode, or device hardware failure will permanently erase local transaction records.</u>
-              </li>
-              <li>
-                <strong>Prevention:</strong> Connect Google Drive above for automatic cloud invoice archiving, and download a daily JSON backup at the end of every business day.
-              </li>
-              <li>
-                <strong>Independent Devices:</strong> PC and mobile terminals maintain independent local databases. Bills created on PC do not appear on mobile, and bills created on mobile do not appear on PC.
-              </li>
-            </ul>
+            <form onSubmit={handleSaveProductModal}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="input-group-label">Product Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={productForm.name}
+                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="input-group-label">Default Base Price (₹) *</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={productForm.defaultPrice}
+                    onChange={(e) => setProductForm({ ...productForm, defaultPrice: e.target.value })}
+                    required
+                    min="0"
+                    step="10"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="input-group-label">Primary Offer Price (₹)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={productForm.offerPrice}
+                    onChange={(e) => setProductForm({ ...productForm, offerPrice: e.target.value })}
+                    placeholder="e.g. 550"
+                    min="0"
+                    step="10"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="input-group-label">Quick Offer Price Buttons (Comma separated)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={productForm.offersStr}
+                    onChange={(e) => setProductForm({ ...productForm, offersStr: e.target.value })}
+                    placeholder="e.g. 550, 500"
+                  />
+                  <small className="field-hint">e.g. 550, 500 will appear as quick tap buttons on mobile.</small>
+                </div>
+
+                <div className="form-group toggle-group">
+                  <label className="checkbox-container">
+                    <input
+                      type="checkbox"
+                      checked={productForm.reductionEnabled}
+                      onChange={(e) => setProductForm({ ...productForm, reductionEnabled: e.target.checked })}
+                    />
+                    <span className="checkmark" />
+                    <span className="checkbox-label">Allow ₹10 Less Reductions on this product</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setEditingProduct(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  <Save size={16} />
+                  <span>Update Price</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </form>
+      )}
     </div>
   );
 }

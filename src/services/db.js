@@ -526,6 +526,10 @@ export async function saveFinalizedBill(billData, userName = 'Cashier', userRole
     createdAt: billData.createdAt || new Date().toISOString(),
     status: 'completed',
     cashierName: userName,
+    saveStatus: 'saved', // Safely saved locally in IndexedDB
+    pdfStatus: billData.pdfStatus || 'not_generated',
+    whatsappStatus: billData.whatsappStatus || 'not_shared',
+    driveUploadStatus: billData.driveUploadStatus || 'pending',
   };
 
   // Atomic write transaction
@@ -545,6 +549,25 @@ export async function saveFinalizedBill(billData, userName = 'Cashier', userRole
 
   await tx.done;
   return bill;
+}
+
+/**
+ * Updates status fields on an existing saved bill (e.g., whatsappStatus, pdfStatus, driveUploadStatus)
+ * without re-creating or altering the original transaction snapshot.
+ */
+export async function updateBillStatus(billId, statusUpdates = {}) {
+  const db = await getDB();
+  const bill = await db.get('bills', billId);
+  if (!bill) return null;
+
+  const updatedBill = {
+    ...bill,
+    ...statusUpdates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await db.put('bills', updatedBill);
+  return updatedBill;
 }
 
 export async function updateBillDriveStatus(billId, driveData) {

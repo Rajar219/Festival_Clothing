@@ -21,8 +21,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
-export function WhatsAppModal({ isOpen, onClose, bill }) {
-  const { settings, startNewBill, showToast } = usePOS();
+export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
+  const { settings, startNewBill, showToast, updateBillRecordStatus } = usePOS();
 
   const [mobileNumber, setMobileNumber] = useState(bill?.customerPhone || '');
   const [errorMsg, setErrorMsg] = useState('');
@@ -30,6 +30,7 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
   const [canShareFile, setCanShareFile] = useState(false);
   const [stepNotice, setStepNotice] = useState('');
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isIncomplete, setIsIncomplete] = useState(false);
 
   useEffect(() => {
     if (bill?.customerPhone) {
@@ -95,13 +96,23 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
             text: receiptText,
             files: [pdfFile],
           });
+          if (updateBillRecordStatus) {
+            await updateBillRecordStatus(bill.id, { whatsappStatus: 'sharing_opened', pdfStatus: 'generated' });
+          }
           setStepNotice('Device share sheet opened! Select WhatsApp to complete sending.');
           showToast('Share dialog opened. Complete sending in WhatsApp.', 'info');
           return;
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          // Cashier dismissed share sheet
+          // Cashier cancelled / dismissed share sheet
+          setIsIncomplete(true);
+          if (onSharingIncomplete) onSharingIncomplete();
+          if (updateBillRecordStatus) {
+            await updateBillRecordStatus(bill.id, { whatsappStatus: 'not_completed' });
+          }
+          setStepNotice('Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.');
+          showToast('WhatsApp sharing was not completed. Bill is safely saved.', 'info');
           return;
         }
         console.warn('Native file share fallback:', err);
@@ -129,16 +140,30 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
     }
 
     // Open WhatsApp Web on PC, or WhatsApp link on mobile
-    const waUrl = isMobileDevice
-      ? `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(receiptText)}`
-      : `https://web.whatsapp.com/send?phone=91${validation.cleanNumber}&text=${encodeURIComponent(receiptText)}`;
+    try {
+      const waUrl = isMobileDevice
+        ? `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(receiptText)}`
+        : `https://web.whatsapp.com/send?phone=91${validation.cleanNumber}&text=${encodeURIComponent(receiptText)}`;
 
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
 
-    setStepNotice(
-      `WhatsApp opened for ${validation.formattedNumber}! The PDF invoice (${pdfFileName}) is downloaded on your computer. Click the 📎 paperclip icon in WhatsApp Web, choose Document, and select the downloaded PDF.`
-    );
-    showToast('WhatsApp opened and PDF downloaded. Complete send in WhatsApp.', 'info');
+      if (updateBillRecordStatus) {
+        await updateBillRecordStatus(bill.id, { whatsappStatus: 'sharing_opened', pdfStatus: 'generated' });
+      }
+
+      setStepNotice(
+        `WhatsApp opened for ${validation.formattedNumber}! The PDF invoice (${pdfFileName}) is downloaded on your computer. Click the 📎 paperclip icon in WhatsApp Web, choose Document, and select the downloaded PDF.`
+      );
+      showToast('WhatsApp opened and PDF downloaded. Complete send in WhatsApp.', 'info');
+    } catch (openErr) {
+      setIsIncomplete(true);
+      if (onSharingIncomplete) onSharingIncomplete();
+      if (updateBillRecordStatus) {
+        await updateBillRecordStatus(bill.id, { whatsappStatus: 'failed' });
+      }
+      setStepNotice('Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.');
+      showToast('WhatsApp window could not be opened. You can download the PDF or retry later from Sales History.', 'warning');
+    }
   };
 
   const handleDownloadOnlyPDF = () => {
@@ -252,11 +277,34 @@ export function WhatsAppModal({ isOpen, onClose, bill }) {
             </button>
           </div>
 
-          {/* Step Guidance Notice */}
+          {/* Step Guidance or Failure Recovery Notice */}
           {stepNotice ? (
-            <div className="whatsapp-status-notice" style={{ background: '#f0fdf4', border: '1px solid #a7f3d0', padding: '12px', borderRadius: '8px' }}>
-              <Info size={18} className="notice-icon" style={{ color: '#059669', flexShrink: 0 }} />
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#064e3b', lineHeight: 1.4 }}>
+            <div
+              className="whatsapp-status-notice"
+              style={{
+                background: isIncomplete ? '#fffbeb' : '#f0fdf4',
+                border: `1px solid ${isIncomplete ? '#fde68a' : '#a7f3d0'}`,
+                padding: '12px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+              }}
+            >
+              <Info
+                size={18}
+                className="notice-icon"
+                style={{ color: isIncomplete ? '#d97706' : '#059669', flexShrink: 0, marginTop: '2px' }}
+              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.85rem',
+                  color: isIncomplete ? '#92400e' : '#064e3b',
+                  lineHeight: 1.4,
+                  fontWeight: isIncomplete ? 600 : 400,
+                }}
+              >
                 {stepNotice}
               </p>
             </div>

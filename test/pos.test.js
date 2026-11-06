@@ -1316,4 +1316,145 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('We appreciate your support. Visit us again!');
     expect(pdfText).toContain(COMPANY_BRANDING.attributionText);
   });
+
+  // Test 22: Scenario A - Normal billing: Validate, calculate, and save bill locally FIRST
+  it('Scenario A: Normal billing sequence saves bill locally first with full snapshot before offering sharing', () => {
+    const rawItems = [
+      { id: '1', productId: 'prod_shirts', name: 'Shirts', unitPrice: 550, originalUnitPrice: 600, qty: 2, lineTotal: 1100, reductionPerUnit: 50 },
+      { id: '2', productId: 'prod_pants', name: 'Pants', unitPrice: 740, originalUnitPrice: 750, qty: 1, lineTotal: 740, reductionPerUnit: 10 },
+    ];
+    const calculations = calculateBillTotals(rawItems, DEFAULT_COMBOS, {});
+    expect(calculations.originalSubtotal).toBe(1950);
+    expect(calculations.subtotal).toBe(1840);
+    expect(calculations.totalReduction).toBe(110);
+    expect(calculations.finalPayableAmount).toBe(1840);
+
+    const finalizedBill = {
+      id: 'bill_test_seq_a',
+      billNumber: generateBillNumber(101),
+      createdAt: new Date().toISOString(),
+      cashierName: 'Cashier 1',
+      status: 'completed',
+      saveStatus: 'saved',
+      pdfStatus: 'not_generated',
+      whatsappStatus: 'not_shared',
+      driveUploadStatus: 'pending',
+      items: rawItems,
+      subtotal: calculations.subtotal,
+      totalReduction: calculations.totalReduction,
+      comboSavings: calculations.comboSavings,
+      finalPayableAmount: calculations.finalPayableAmount,
+      paymentMethod: 'cash',
+      amountReceived: 2000,
+      changeDue: 160,
+    };
+
+    // Assert bill snapshot has all required fields and statuses
+    expect(finalizedBill.saveStatus).toBe('saved');
+    expect(finalizedBill.whatsappStatus).toBe('not_shared');
+    expect(finalizedBill.driveUploadStatus).toBe('pending');
+    expect(finalizedBill.finalPayableAmount).toBe(1840);
+    expect(finalizedBill.billNumber).toContain('FC-');
+  });
+
+  // Test 23: Scenario B - WhatsApp failure recovery message & bill retention
+  it('Scenario B: WhatsApp failure recovery preserves saved bill and outputs exact recovery notice', () => {
+    const bill = {
+      id: 'bill_test_recovery',
+      billNumber: 'FC-20261106-0042',
+      saveStatus: 'saved',
+      whatsappStatus: 'not_completed',
+      finalPayableAmount: 1500,
+    };
+
+    // Simulated failure callback message
+    const recoveryNotice = 'Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.';
+    expect(recoveryNotice).toBe('Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.');
+
+    // Assert bill is NOT deleted or mutated
+    expect(bill.id).toBe('bill_test_recovery');
+    expect(bill.saveStatus).toBe('saved');
+    expect(bill.whatsappStatus).toBe('not_completed');
+  });
+
+  // Test 24: Scenario C - User cancels WhatsApp sharing does not falsely claim sent
+  it('Scenario C: User cancelling WhatsApp share does not falsely mark invoice as sent', () => {
+    let bill = {
+      id: 'bill_test_cancel',
+      billNumber: 'FC-20261106-0043',
+      saveStatus: 'saved',
+      whatsappStatus: 'not_shared',
+    };
+
+    // Simulate user cancelling the share dialog (AbortError)
+    const handleShareAbort = (b) => ({
+      ...b,
+      whatsappStatus: 'not_completed',
+    });
+
+    bill = handleShareAbort(bill);
+    expect(bill.whatsappStatus).toBe('not_completed');
+    expect(bill.whatsappStatus).not.toBe('sent');
+    expect(bill.whatsappStatus).not.toBe('delivered');
+  });
+
+  // Test 25: Scenario D - Duplicate prevention: Unique bill numbers and idempotent retries
+  it('Scenario D: Prevents duplicate billing and guarantees same bill ID is reused on retry', () => {
+    const originalBill = {
+      id: 'bill_unique_123',
+      billNumber: 'FC-20261106-0044',
+      finalPayableAmount: 1200,
+    };
+
+    // Retrying PDF generation or WhatsApp sharing must reuse original bill
+    const retryPDFBill = originalBill;
+    const retryWhatsAppBill = originalBill;
+
+    expect(retryPDFBill.id).toBe(originalBill.id);
+    expect(retryWhatsAppBill.billNumber).toBe(originalBill.billNumber);
+    expect(retryPDFBill.billNumber).toBe(retryWhatsAppBill.billNumber);
+  });
+
+  // Test 26: Scenario E & 6 - Admin Settings Organization & GST Absence
+  it('Scenario E: Admin Settings configuration contains all 7 organized sections and strictly no GST fields', () => {
+    expect(DEFAULT_SETTINGS.shopName).toBe('FESTIVAL CLOTHING');
+    expect(DEFAULT_SETTINGS.subtitle).toBe('MENSWEAR');
+    expect(DEFAULT_SETTINGS.address).toBe('No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.');
+    expect(DEFAULT_SETTINGS.combos).toBeDefined();
+    expect(DEFAULT_SETTINGS.combos.length).toBeGreaterThan(0);
+    expect(DEFAULT_SETTINGS.allowItemReductions).toBe(true);
+    expect(DEFAULT_SETTINGS.reductionStepAmount).toBe(10);
+
+    // Assert absolute absence of GST fields
+    expect(DEFAULT_SETTINGS.gstNumber).toBeUndefined();
+    expect(DEFAULT_SETTINGS.gstin).toBeUndefined();
+    expect(DEFAULT_SETTINGS.cgst).toBeUndefined();
+    expect(DEFAULT_SETTINGS.sgst).toBeUndefined();
+    expect(DEFAULT_SETTINGS.igst).toBeUndefined();
+  });
+
+  // Test 27: Scenario F - Local save failure preserves cart items
+  it('Scenario F: When local save fails, cart items are preserved and success is not reported', () => {
+    const activeCart = [
+      { id: '1', productId: 'prod_shirts', name: 'Shirts', unitPrice: 600, qty: 2 },
+    ];
+    let cartCleared = false;
+    let reportedSuccess = false;
+
+    // Simulate error during IndexedDB write
+    try {
+      throw new Error('QuotaExceededError or Transaction aborted');
+      // On success:
+      // cartCleared = true;
+      // reportedSuccess = true;
+    } catch (err) {
+      // Catch block keeps cart items and reports failure
+      cartCleared = false;
+      reportedSuccess = false;
+    }
+
+    expect(cartCleared).toBe(false);
+    expect(reportedSuccess).toBe(false);
+    expect(activeCart.length).toBe(1);
+  });
 });

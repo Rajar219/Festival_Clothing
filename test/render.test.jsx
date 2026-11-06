@@ -127,6 +127,35 @@ describe('App Render & Responsive Design Test', () => {
     expect(modalHtml).toContain('btn-modal-confirm');
   });
 
+  it('tests SettingsView rendering directly with admin privileges', async () => {
+    const { SettingsView } = await import('../src/components/SettingsView');
+    const { POSContext } = await import('../src/context/POSContext');
+    const { DEFAULT_SETTINGS } = await import('../src/services/db');
+
+    const mockPOS = {
+      settings: DEFAULT_SETTINGS,
+      products: [],
+      allBills: [],
+      updateSettings: async () => {},
+      isAdmin: true,
+      setIsAdminAuthModalOpen: () => {},
+      refreshBills: async () => {},
+      showToast: () => {},
+      isDriveConnected: false,
+      connectDrive: async () => {},
+      disconnectDrive: () => {},
+    };
+
+    const html = renderToString(
+      <POSContext.Provider value={mockPOS}>
+        <SettingsView />
+      </POSContext.Provider>
+    );
+
+    expect(html).toContain('Shop Administration');
+    expect(html).toContain('Shop Branding');
+  });
+
   it('verifies index.css strictly implements compact thumbnail, flex-column, and non-overlapping footer architecture', () => {
     const cssPath = path.resolve(__dirname, '../src/index.css');
     const cssContent = fs.readFileSync(cssPath, 'utf-8');

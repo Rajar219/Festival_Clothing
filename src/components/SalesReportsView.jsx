@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { usePOS } from '../context/POSContext';
 import { useModalBehavior } from '../hooks/useModalBehavior';
 import { formatINR, formatDateTime } from '../utils/currency';
+import { generateReceiptPDF } from '../utils/receiptGenerator';
+import { WhatsAppModal } from './WhatsAppModal';
 import {
   exportLineItemsCSV,
   exportBillsSummaryCSV,
@@ -30,6 +32,9 @@ import {
   Info,
   Package,
   Trash2,
+  Send,
+  Cloud,
+  CheckCircle2,
 } from 'lucide-react';
 
 export function SalesReportsView({ defaultTab = 'history' }) {
@@ -59,10 +64,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const [selectedBill, setSelectedBill] = useState(null);
+  const [whatsAppBill, setWhatsAppBill] = useState(null);
   const [billToCancel, setBillToCancel] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
   const [billToDelete, setBillToDelete] = useState(null);
+
+  const handleDownloadBillPDF = (bill) => {
+    try {
+      generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
+      showToast(`Thermal PDF invoice downloaded for ${bill.billNumber}`, 'success');
+    } catch (err) {
+      showToast('Failed to generate PDF: ' + err.message, 'error');
+    }
+  };
   const [isDeleting, setIsDeleting] = useState(false);
 
   const activeReportsModal = Boolean(selectedBill || billToCancel || billToDelete);
@@ -624,6 +639,23 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                           </button>
                           <button
                             type="button"
+                            className="btn-icon-action whatsapp"
+                            onClick={() => setWhatsAppBill(bill)}
+                            title="Share invoice on WhatsApp"
+                            style={{ color: '#059669' }}
+                          >
+                            <Send size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-icon-action download"
+                            onClick={() => handleDownloadBillPDF(bill)}
+                            title="Download Thermal A4 PDF"
+                          >
+                            <Download size={15} />
+                          </button>
+                          <button
+                            type="button"
                             className="btn-icon-action print"
                             onClick={() => triggerPrint(bill, 'thermal')}
                             title="Reprint receipt"
@@ -718,6 +750,25 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                     >
                       <Eye size={15} />
                       <span>Details</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="mobile-bill-action-btn whatsapp"
+                      onClick={() => setWhatsAppBill(bill)}
+                      title="Share on WhatsApp"
+                      style={{ color: '#059669' }}
+                    >
+                      <Send size={15} />
+                      <span>WhatsApp</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="mobile-bill-action-btn download"
+                      onClick={() => handleDownloadBillPDF(bill)}
+                      title="Download PDF"
+                    >
+                      <Download size={15} />
+                      <span>PDF</span>
                     </button>
                     <button
                       type="button"
@@ -822,7 +873,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
               <div className="details-totals-grid">
                 <div className="payment-meta-box">
-                  <h4>Payment Information</h4>
+                  <h4>Payment & Storage Status</h4>
                   <p><strong>Payment Mode:</strong> {selectedBill.paymentMethod.toUpperCase()}</p>
                   <p><strong>Cashier:</strong> {selectedBill.cashierName || 'Cashier'}</p>
                   {selectedBill.amountReceived > 0 && (
@@ -834,6 +885,17 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   {selectedBill.upiRef && (
                     <p><strong>UPI Ref:</strong> {selectedBill.upiRef}</p>
                   )}
+                  <p><strong>Local Storage:</strong> Saved (WisdoFestivalPOS_DB)</p>
+                  <p>
+                    <strong>Google Drive Status:</strong>{' '}
+                    {selectedBill.driveUploadStatus === 'uploaded' ? (
+                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                        Backed up ({selectedBill.driveFolderName || 'PC BILLING'})
+                      </span>
+                    ) : (
+                      <span style={{ color: '#d97706' }}>Drive backup pending</span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="totals-summary-box">
@@ -855,7 +917,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
               <button
                 type="button"
                 className="btn-danger-outline"
@@ -863,7 +925,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 title="Permanently delete this bill from database"
               >
                 <Trash2 size={16} />
-                <span>Delete Bill</span>
+                <span>Delete</span>
               </button>
 
               <div style={{ flex: 1 }} />
@@ -874,6 +936,26 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 onClick={() => setSelectedBill(null)}
               >
                 Close
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleDownloadBillPDF(selectedBill)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={16} />
+                <span>Download PDF</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setWhatsAppBill(selectedBill)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#059669', borderColor: '#a7f3d0' }}
+              >
+                <Send size={16} />
+                <span>Share WhatsApp</span>
               </button>
 
               <button
@@ -1016,6 +1098,12 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           </div>
         </div>
       )}
+      {/* WhatsApp Modal for Retrying / Sharing Historical Bills */}
+      <WhatsAppModal
+        isOpen={Boolean(whatsAppBill)}
+        onClose={() => setWhatsAppBill(null)}
+        bill={whatsAppBill}
+      />
     </div>
   );
 }

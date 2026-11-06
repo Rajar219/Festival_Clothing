@@ -37,10 +37,12 @@ export function SuccessModal() {
   const [targetFolder, setTargetFolder] = useState(settings.deviceType || 'PC');
   const [isSavingDrive, setIsSavingDrive] = useState(false);
   const [driveUploadError, setDriveUploadError] = useState(null);
+  const [whatsAppIncompleteNotice, setWhatsAppIncompleteNotice] = useState(false);
 
   useEffect(() => {
     setTargetFolder(settings.deviceType || 'PC');
     setDriveUploadError(null);
+    setWhatsAppIncompleteNotice(false);
   }, [lastFinalizedBill, settings.deviceType]);
 
   useEffect(() => {
@@ -123,7 +125,25 @@ export function SuccessModal() {
             <div className="success-icon-badge">
               <CheckCircle2 size={44} className="success-icon" />
             </div>
-            <h2 id="success-dialog-title" className="success-title">Bill Saved Locally!</h2>
+            <h2 id="success-dialog-title" className="success-title">Bill Saved Successfully!</h2>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#ecfdf5',
+                color: '#064e3b',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                marginTop: '6px',
+                marginBottom: '4px',
+              }}
+            >
+              <CheckCircle2 size={14} style={{ color: '#059669' }} />
+              <span>Saved locally in browser database (WisdoFestivalPOS_DB)</span>
+            </div>
             <span className="success-bill-number">
               Bill No: <strong>{lastFinalizedBill.billNumber}</strong>
             </span>
@@ -131,6 +151,30 @@ export function SuccessModal() {
               {formatDateTime(lastFinalizedBill.createdAt)}
             </span>
           </div>
+
+          {/* Recovery message if WhatsApp was not completed */}
+          {whatsAppIncompleteNotice && (
+            <div
+              className="recovery-message-banner"
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                color: '#92400e',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <AlertCircle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+              <span>
+                Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.
+              </span>
+            </div>
+          )}
 
           <div className="success-summary-box">
             <div className="summary-stat-row">
@@ -360,6 +404,7 @@ export function SuccessModal() {
         isOpen={isWhatsAppOpen}
         onClose={() => setIsWhatsAppOpen(false)}
         bill={lastFinalizedBill}
+        onSharingIncomplete={() => setWhatsAppIncompleteNotice(true)}
       />
     </>
   );

@@ -28,6 +28,7 @@ export function Header() {
     activePrintMode,
     isAdmin,
     setIsAdminAuthModalOpen,
+    setPendingNavTarget,
     switchRoleToCashier,
     isDriveConnected,
   } = usePOS();
@@ -55,6 +56,7 @@ export function Header() {
 
   const handleNavClick = (viewName) => {
     if ((viewName === 'settings' || viewName === 'products') && !isAdmin) {
+      setPendingNavTarget(viewName);
       setIsAdminAuthModalOpen(true);
       return;
     }
@@ -211,7 +213,10 @@ export function Header() {
             <button
               type="button"
               className="cashier-login-pill"
-              onClick={() => setIsAdminAuthModalOpen(true)}
+              onClick={() => {
+                setPendingNavTarget('settings');
+                setIsAdminAuthModalOpen(true);
+              }}
               title="Click to authenticate as Administrator (PIN: 1234)"
             >
               <User size={13} />

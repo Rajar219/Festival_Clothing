@@ -10,6 +10,7 @@ import {
   getShopSettings,
   saveShopSettings as saveShopSettingsInDB,
   saveFinalizedBill,
+  updateBillStatus,
   updateBillDriveStatus,
   getAllBills,
   cancelBill as cancelBillInDB,
@@ -65,6 +66,7 @@ export function POSProvider({ children }) {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [pendingNavTarget, setPendingNavTarget] = useState(null);
   const [billToPrint, setBillToPrint] = useState(null);
   const [activePrintMode, setActivePrintMode] = useState('thermal');
   const [lastFinalizedBill, setLastFinalizedBill] = useState(null);
@@ -524,29 +526,34 @@ export function POSProvider({ children }) {
           },
         };
 
-        // Persist atomically to database
-        await saveFinalizedBill(finalizedBill, currentUserName, userRole);
+        // Step 2: Persist atomically to IndexedDB FIRST
+        const savedBill = await saveFinalizedBill(finalizedBill, currentUserName, userRole);
 
-        // Update state
-        setLastFinalizedBill(finalizedBill);
-        setBillToPrint(finalizedBill);
+        // Update in-memory state and history
+        setLastFinalizedBill(savedBill);
+        setBillToPrint(savedBill);
         await refreshBills();
 
-        // Note: Google Drive upload is MANUAL SAVE ONLY. No background or automatic upload.
+        // Clear active cart items now that bill is safely saved
+        setItems([]);
+        setCustomerName('');
+        setCustomerPhone('');
+        setAppliedComboDecisions({});
 
+        // Step 3: Open Success confirmation modal
         setIsCheckoutModalOpen(false);
         setIsSuccessModalOpen(true);
 
-        showToast(`Bill ${billNumber} created successfully!`, 'success');
+        showToast(`Bill saved successfully! Bill No: ${billNumber}`, 'success');
 
         if (settings.autoPrintOnCheckout) {
           setTimeout(() => window.print(), 400);
         }
 
-        return finalizedBill;
+        return savedBill;
       } catch (err) {
-        console.error('Finalize checkout error:', err);
-        showToast('Checkout failed: ' + err.message, 'error');
+        console.error('Finalize checkout local save error:', err);
+        showToast('Local save failed: ' + err.message + '. Cart items preserved. Please retry.', 'error');
         return false;
       } finally {
         isSubmittingRef.current = false;
@@ -712,29 +719,55 @@ export function POSProvider({ children }) {
     [isAdmin, userRole, currentUserName, refreshBills, showToast]
   );
 
-  // Role switching
+  // Role switching with pending navigation target resolution
   const loginAsAdmin = useCallback((pin) => {
     // Default PIN: 1234
     if (pin === '1234' || pin === 'admin') {
       setUserRole('admin');
       setCurrentUserName('Admin');
       setIsAdminAuthModalOpen(false);
+      const target = pendingNavTarget || 'settings';
+      setCurrentView(target);
+      setPendingNavTarget(null);
       showToast('Logged in as Administrator (Full Access)', 'success');
       return true;
     } else {
       showToast('Invalid Administrator PIN.', 'error');
       return false;
     }
-  }, [showToast]);
+  }, [pendingNavTarget, showToast]);
 
   const switchRoleToCashier = useCallback(() => {
     setUserRole('cashier');
     setCurrentUserName('Cashier 1');
+    setPendingNavTarget(null);
     if (currentView === 'products' || currentView === 'settings') {
       setCurrentView('billing');
     }
     showToast('Switched to Cashier mode.', 'info');
   }, [currentView, showToast]);
+
+  // Update Bill status fields (whatsappStatus, pdfStatus, etc.) safely in IndexedDB
+  const updateBillRecordStatus = useCallback(async (billId, statusUpdates) => {
+    try {
+      const updated = await updateBillStatus(billId, statusUpdates);
+      if (updated) {
+        setAllBills((prev) =>
+          prev.map((b) => (b.id === billId ? { ...b, ...updated } : b))
+        );
+        setLastFinalizedBill((prev) => {
+          if (prev && prev.id === billId) {
+            return { ...prev, ...updated };
+          }
+          return prev;
+        });
+      }
+      return updated;
+    } catch (err) {
+      console.error('Failed to update bill status:', err);
+      return null;
+    }
+  }, []);
 
   // Google Drive Cloud Storage Integration
   const connectDrive = useCallback(async () => {
@@ -872,6 +905,9 @@ export function POSProvider({ children }) {
     switchRoleToCashier,
     isAdminAuthModalOpen,
     setIsAdminAuthModalOpen,
+    pendingNavTarget,
+    setPendingNavTarget,
+    updateBillRecordStatus,
     products,
     isLoadingProducts,
     updateProductPrice,
