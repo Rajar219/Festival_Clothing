@@ -898,25 +898,23 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           <table className="ledger-table">
             <thead>
               <tr>
-                <th className="text-center" style={{ width: '56px' }}>S.No</th>
-                <th>Bill Number</th>
-                <th>Date & Time</th>
-                <th>Terminal</th>
-                <th>Cashier</th>
-                <th>Customer</th>
-                <th>Items Summary</th>
-                <th className="text-right">Original</th>
-                <th className="text-center">Discount</th>
-                <th className="text-right">Final Amount</th>
-                <th className="text-center">Payment</th>
-                <th className="text-center">Status</th>
-                <th className="text-center">Actions</th>
+                <th className="text-center" style={{ width: '48px' }}>S.NO</th>
+                <th>BILL NUMBER</th>
+                <th>DATE & TIME</th>
+                <th>CASHIER</th>
+                <th>ITEMS SUMMARY</th>
+                <th className="text-right">SUBTOTAL</th>
+                <th className="text-center">REDUCTION</th>
+                <th className="text-right">FINAL AMOUNT</th>
+                <th className="text-center">PAYMENT</th>
+                <th className="text-center">STATUS</th>
+                <th className="text-center" style={{ minWidth: '175px', whiteSpace: 'nowrap' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredBills.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="text-center empty-ledger-cell">
+                  <td colSpan={11} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
                     <p>No bills found for the selected filter criteria.</p>
                   </td>
@@ -924,7 +922,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               ) : (
                 filteredBills.map((bill, index) => {
                   const isCancelled = bill.status === 'cancelled';
-                  const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
+                  const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
 
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
@@ -938,23 +936,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         <span className="timestamp-text">{formatDateTime(bill.createdAt)}</span>
                       </td>
                       <td>
-                        <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
-                          {isMobileTerminal ? <Smartphone size={12} /> : <Laptop size={12} />}
-                          <span>{isMobileTerminal ? 'Mobile' : 'PC'}</span>
-                        </span>
-                      </td>
-                      <td>
                         <span className="cashier-tag">{bill.cashierName || 'Cashier'}</span>
-                      </td>
-                      <td>
-                        {bill.customerName ? (
-                          <div className="customer-info-tag">
-                            <span>{bill.customerName}</span>
-                            {bill.customerPhone && <small>{bill.customerPhone}</small>}
-                          </div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
                       </td>
                       <td>
                         <span className="items-summary-text">
@@ -962,12 +944,12 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         </span>
                       </td>
                       <td className="text-right">
-                        <span className="text-muted">₹{bill.subtotal || bill.finalPayableAmount}</span>
+                        <span>{formatINR(bill.subtotal || bill.finalPayableAmount, false)}</span>
                       </td>
                       <td className="text-center">
-                        {(bill.totalReduction > 0 || bill.comboSavings > 0) ? (
+                        {totalSavings > 0 ? (
                           <span className="reduction-badge">
-                            -₹{(bill.totalReduction || 0) + (bill.comboSavings || 0)}
+                            -₹{totalSavings}
                           </span>
                         ) : (
                           <span className="text-muted">—</span>
@@ -975,7 +957,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                       </td>
                       <td className="text-right">
                         <strong className={`final-amount-text ${isCancelled ? 'struck' : ''}`}>
-                          {formatINR(bill.finalPayableAmount, true)}
+                          {formatINR(bill.finalPayableAmount, false)}
                         </strong>
                       </td>
                       <td className="text-center">
@@ -985,13 +967,13 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                       </td>
                       <td className="text-center">
                         {isCancelled ? (
-                          <span className="badge-status cancelled" title={bill.cancelReason}>VOIDED</span>
+                          <span className="badge-status cancelled" title={bill.cancelReason}>CANCELLED</span>
                         ) : (
-                          <span className="badge-status paid">PAID</span>
+                          <span className="badge-status paid">COMPLETED</span>
                         )}
                       </td>
-                      <td className="text-center">
-                        <div className="action-buttons-cell">
+                      <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
+                        <div className="ledger-action-btns">
                           <button
                             type="button"
                             className="btn-icon-action view"

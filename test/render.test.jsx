@@ -322,14 +322,14 @@ describe('App Render & Responsive Design Test', () => {
   });
 
   it('verifies SalesReportsView renders S.No headers in Sales History and Reports & Analytics tables', () => {
-    // 1. History mode S.No
+    // 1. History mode S.NO
     const historyHtml = renderToString(
       <POSProvider>
         <SalesReportsView defaultTab="history" />
       </POSProvider>
     );
-    expect(historyHtml).toContain('S.No');
-    expect(historyHtml).toContain('Bill Number');
+    expect(historyHtml.toUpperCase()).toContain('S.NO');
+    expect(historyHtml.toUpperCase()).toContain('BILL NUMBER');
 
     // 2. Reports mode S.No
     const reportsHtml = renderToString(
@@ -337,7 +337,7 @@ describe('App Render & Responsive Design Test', () => {
         <SalesReportsView defaultTab="reports" />
       </POSProvider>
     );
-    expect(reportsHtml).toContain('S.No');
+    expect(reportsHtml.toUpperCase()).toContain('S.NO');
     expect(reportsHtml).toContain('Reports &amp; Analytics');
   });
 });
