@@ -36,6 +36,8 @@ export function BillSummary() {
     cashChangeDue,
     upiRef,
     setUpiRef,
+    alsoUploadToDrive,
+    setAlsoUploadToDrive,
     setIsCheckoutModalOpen,
   } = usePOS();
 
@@ -76,6 +78,7 @@ export function BillSummary() {
         amountReceived: paymentMethod === 'cash' ? (parseFloat(cashReceived) || finalPayableAmount) : finalPayableAmount,
         changeDue: paymentMethod === 'cash' ? cashChangeDue : 0,
         upiRef: paymentMethod === 'upi' ? upiRef.trim() : '',
+        alsoUploadToDrive,
       });
 
       if (!result) {
@@ -278,6 +281,22 @@ export function BillSummary() {
               </div>
             </div>
           )}
+          {/* Prompt Required Optional Google Drive Backup Checkbox (Default: UNCHECKED) */}
+          <div className="optional-drive-backup-row" style={{ marginTop: '8px' }}>
+            <label className="drive-backup-toggle-label" htmlFor="summary-drive-backup-checkbox">
+              <input
+                type="checkbox"
+                id="summary-drive-backup-checkbox"
+                className="drive-backup-checkbox-input"
+                checked={alsoUploadToDrive}
+                onChange={(e) => setAlsoUploadToDrive(e.target.checked)}
+              />
+              <div className="drive-backup-text-wrap">
+                <span className="drive-backup-title-text">Also upload this bill to Google Drive</span>
+                <span className="drive-backup-hint-text">Optional PDF archive (FESTIVAL SALES BILL)</span>
+              </div>
+            </label>
+          </div>
         </div>
 
         {/* Save error banner with retry option */}

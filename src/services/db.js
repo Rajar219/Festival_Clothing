@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import { generateBillNumber, rupeesToPaise, paiseToRupees } from '../utils/currency';
 import { DEFAULT_COMBOS } from '../utils/comboEngine';
+import { getTerminalId, getTerminalType } from './terminal';
 
 const DB_NAME = 'WisdoFestivalPOS_DB';
 const DB_VERSION = 2;
@@ -210,12 +211,38 @@ export const INITIAL_PRODUCTS = [
   },
 ];
 
+export const FESTIVE_QUOTES = [
+  "May your celebrations be filled with happiness, light and style.",
+  "Celebrate every moment. Wear every memory.",
+  "Wishing you joy, prosperity and beautiful celebrations.",
+  "Let every celebration bring a new reason to smile.",
+  "Style your celebrations. Celebrate your moments.",
+  "May your festive season shine with happiness and success.",
+  "Every celebration deserves a little extra style.",
+  "Thank you for making us part of your special moments.",
+];
+
+export function getBillFestiveQuote(bill) {
+  if (bill && bill.festiveQuote) return bill.festiveQuote;
+  const seedStr = (bill && (bill.id || bill.billNumber)) || '';
+  if (seedStr) {
+    let hash = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % FESTIVE_QUOTES.length;
+    return FESTIVE_QUOTES[idx];
+  }
+  return FESTIVE_QUOTES[Math.floor(Math.random() * FESTIVE_QUOTES.length)];
+}
+
 export const DEFAULT_SETTINGS = {
   shopName: 'FESTIVAL CLOTHING',
   subtitle: 'MENSWEAR',
   address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
   phone: '',
-  receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill in original condition.',
+  receiptFooter: 'Wishing you a Happy & Prosperous Celebration!',
   defaultPrintMode: 'thermal', // 'thermal' or 'a4'
   upiId: 'festivalclothing@okhdfcbank',
   autoPrintOnCheckout: false,
@@ -521,15 +548,23 @@ export async function saveFinalizedBill(billData, userName = 'Cashier', userRole
     throw new Error(`Bill ${billData.billNumber} has already been saved. Duplicate bill creation prevented.`);
   }
 
+  const terminalId = billData.terminalId || getTerminalId();
+  const terminalType = billData.terminalType || getTerminalType();
+
   const bill = {
     ...billData,
+    terminalId,
+    terminalType,
     createdAt: billData.createdAt || new Date().toISOString(),
     status: 'completed',
     cashierName: userName,
     saveStatus: 'saved', // Safely saved locally in IndexedDB
+    festiveQuote: billData.festiveQuote || getBillFestiveQuote(billData),
+    syncStatus: billData.syncStatus || 'pending', // Queued for cross-device synchronization
+    syncedAt: billData.syncedAt || null,
     pdfStatus: billData.pdfStatus || 'not_generated',
     whatsappStatus: billData.whatsappStatus || 'not_shared',
-    driveUploadStatus: billData.driveUploadStatus || 'pending',
+    driveUploadStatus: billData.driveUploadStatus || (billData.alsoUploadToDrive ? 'pending' : 'not_requested'),
   };
 
   // Atomic write transaction
@@ -541,7 +576,7 @@ export async function saveFinalizedBill(billData, userName = 'Cashier', userRole
     action: 'BILL_FINALIZED',
     userRole,
     userName,
-    details: `Finalized bill ${bill.billNumber} for ₹${bill.finalPayableAmount} (${bill.paymentMethod.toUpperCase()}) with ₹${bill.totalReduction || 0} in item reductions`,
+    details: `Finalized bill ${bill.billNumber} for ₹${bill.finalPayableAmount} (${bill.paymentMethod.toUpperCase()}) on ${terminalType} terminal with ₹${bill.totalReduction || 0} in item reductions`,
     targetId: bill.id,
     timestamp: new Date().toISOString(),
   };

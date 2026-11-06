@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server';
 import App from '../src/App';
 import { POSProvider } from '../src/context/POSContext';
 import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
+import { FESTIVE_QUOTES, getBillFestiveQuote } from '../src/services/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -274,5 +275,48 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('.checkout-modal-sheet');
     expect(cssContent).toContain('max-height: 90dvh');
     expect(cssContent).toContain('.checkout-finalize-btn');
+  });
+
+  it('verifies MobileBottomNav renders all 4 sections with navigation IDs and labels', () => {
+    const html = renderToString(
+      <POSProvider>
+        <App />
+      </POSProvider>
+    );
+
+    // Check Mobile Bottom Nav dock
+    expect(html).toContain('mobile-bottom-nav-bar');
+    expect(html).toContain('mobile-nav-billing');
+    expect(html).toContain('mobile-nav-history');
+    expect(html).toContain('mobile-nav-reports');
+    expect(html).toContain('mobile-nav-settings');
+
+    // Check labels
+    expect(html).toContain('Billing');
+    expect(html).toContain('Sales History');
+    expect(html).toContain('Reports');
+    expect(html).toContain('Admin Settings');
+  });
+
+  it('verifies Festive Quotes list, quote stability, and customer-facing invoice redesign', () => {
+    // 1. Verify exactly 8 approved quotes
+    expect(FESTIVE_QUOTES.length).toBe(8);
+    FESTIVE_QUOTES.forEach((quote) => {
+      expect(typeof quote).toBe('string');
+      expect(quote.length).toBeGreaterThan(15);
+      // No religious references or promotional claims
+      expect(quote).not.toMatch(/diwali|god|lord|sale|discount|free|offer/i);
+    });
+
+    // 2. Verify stability for the same bill
+    const sampleBill1 = { id: 'bill_abc_123', billNumber: '20261106-0001' };
+    const quote1A = getBillFestiveQuote(sampleBill1);
+    const quote1B = getBillFestiveQuote(sampleBill1);
+    expect(quote1A).toBe(quote1B);
+    expect(FESTIVE_QUOTES).toContain(quote1A);
+
+    // 3. Verify bill with existing quote preserves it
+    const sampleBill2 = { id: 'bill_xyz', festiveQuote: FESTIVE_QUOTES[3] };
+    expect(getBillFestiveQuote(sampleBill2)).toBe(FESTIVE_QUOTES[3]);
   });
 });

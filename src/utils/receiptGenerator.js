@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { formatINR, formatDateTime } from './currency';
+import { getBillFestiveQuote } from '../services/db';
 
 /**
  * Validates and cleans Indian mobile numbers
@@ -88,7 +89,9 @@ export function generateReceiptPDF(bill, options = {}) {
       ? bill.storeDetails.address
       : 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
     phone: bill.storeDetails?.phone && bill.storeDetails.phone !== '+91 98400 12345' ? bill.storeDetails.phone : '',
-    receiptFooter: bill.storeDetails?.receiptFooter || 'Wishing you a Happy & Prosperous Diwali! Exchanges within 7 days with bill in original condition.',
+    receiptFooter: bill.storeDetails?.receiptFooter && !bill.storeDetails.receiptFooter.includes('7 days')
+      ? bill.storeDetails.receiptFooter
+      : 'Wishing you a Happy & Prosperous Celebration!',
   };
 
   if (mode === 'thermal') {
@@ -279,20 +282,22 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.line(marginLeft, y, marginRight, y);
     y += 6;
 
-    // Footer & Customer Thank You
+    // Footer & Customer Thank You with Rotating Festive Quote
+    const festiveQuote = getBillFestiveQuote(bill);
+
     doc.setFont('courier', 'bold');
-    doc.setFontSize(11);
-    doc.text('Thanks for purchasing from FESTIVAL CLOTHING!', pageCenter, y, { align: 'center' });
+    doc.setFontSize(10.5);
+    doc.text('THANK YOU FOR SHOPPING WITH US!', pageCenter, y, { align: 'center' });
     y += 5;
 
     doc.setFont('courier', 'normal');
-    doc.setFontSize(9.5);
-    doc.text('We appreciate your support. Visit us again!', pageCenter, y, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text('We truly appreciate your support.', pageCenter, y, { align: 'center' });
     y += 5;
 
-    doc.setFontSize(8);
-    doc.text('• Goods once sold can be exchanged within 7 days with this bill in original condition.', pageCenter, y, { align: 'center' });
-    y += 5;
+    doc.setFontSize(8.5);
+    doc.text(`"${festiveQuote}"`, pageCenter, y, { align: 'center', maxWidth: 160 });
+    y += 6;
 
     doc.setLineDashPattern([], 0);
     doc.setDrawColor(200, 200, 200);
@@ -300,8 +305,8 @@ export function generateReceiptPDF(bill, options = {}) {
     y += 5;
 
     doc.setFont('courier', 'bold');
-    doc.setFontSize(9);
-    doc.text('FESTIVAL CLOTHING - MENSWEAR', pageCenter, y, { align: 'center' });
+    doc.setFontSize(9.5);
+    doc.text('FESTIVAL CLOTHING — MENSWEAR', pageCenter, y, { align: 'center' });
 
     const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {
@@ -472,20 +477,17 @@ export function generateReceiptPDF(bill, options = {}) {
     const totalDiscount = (bill.totalReduction || 0) + (bill.comboSavings || 0);
     const finalPayable = bill.finalPayableAmount ?? (origMerchandiseValue - totalDiscount);
 
-    // Terms & Conditions on the Left
+    // Customer Store Appreciation on the Left
     const termsStartY = y;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('Terms & Conditions:', marginLeft, termsStartY);
+    doc.text('Customer Notice:', marginLeft, termsStartY);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
-    doc.text('• Goods once sold can be exchanged within 7 days with this bill.', marginLeft, termsStartY + 5);
-    doc.text('• Items must be unwashed, unworn, and retain all original retail tags.', marginLeft, termsStartY + 9.5);
-    if (store.receiptFooter) {
-      doc.text(`• ${store.receiptFooter}`, marginLeft, termsStartY + 14, { maxWidth: 88 });
-    }
+    doc.text('• Thank you for visiting Festival Clothing Menswear.', marginLeft, termsStartY + 5);
+    doc.text('• We appreciate your valued business and support.', marginLeft, termsStartY + 9.5);
 
     // Order Summary Section on the Right
     const totalsLeft = 115;
@@ -551,18 +553,27 @@ export function generateReceiptPDF(bill, options = {}) {
     // Natural vertical spacing to reach ~60-70% page height (around y=175mm–190mm)
     y = Math.max(y + 12, 175);
 
-    // Clean Two-Line Thank You Footer
+    // Clean Premium Thank You Footer with Rotating Festive Quote
+    const festiveQuote = getBillFestiveQuote(bill);
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
+    doc.setFontSize(11);
     doc.setTextColor(6, 78, 59);
-    doc.text('Thank you for shopping with FESTIVAL CLOTHING!', 105, y, { align: 'center' });
-    y += 5;
+    doc.text('THANK YOU FOR SHOPPING WITH US!', 105, y, { align: 'center' });
+    y += 5.5;
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text('We appreciate your purchase. Visit us again!', 105, y, { align: 'center' });
+    doc.text('We truly appreciate your support.', 105, y, { align: 'center' });
     y += 6;
+
+    // Rotating Festive Quote
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(5, 150, 105);
+    doc.text(`"${festiveQuote}"`, 105, y, { align: 'center', maxWidth: 160 });
+    y += 7;
 
     // Bottom Separator
     doc.setDrawColor(209, 250, 229);
@@ -571,7 +582,7 @@ export function generateReceiptPDF(bill, options = {}) {
 
     // Attribution branding
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
+    doc.setFontSize(9);
     doc.setTextColor(6, 78, 59);
     doc.text('FESTIVAL CLOTHING - MENSWEAR', 105, y, { align: 'center' });
 

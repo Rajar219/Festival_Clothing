@@ -5199,3 +5199,453 @@ kbd {
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
   }
 }
+
+/* ==========================================================================
+   MOBILE BOTTOM NAVIGATION & DUAL VIEWPORT PARITY
+   ========================================================================== */
+
+.mobile-bottom-nav-bar {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .mobile-bottom-nav-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: #064e3b;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
+    z-index: 9999;
+    align-items: stretch;
+    justify-content: space-around;
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    border-top: 3px solid transparent;
+    color: #a7f3d0;
+    cursor: pointer;
+    padding: 6px 4px 4px 4px;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-item:active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-nav-item.active {
+    color: #ffffff;
+    border-top-color: #34d399;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .mobile-nav-icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-nav-badge {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
+  .mobile-nav-lock {
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    color: #fef08a;
+  }
+
+  .mobile-nav-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  /* Ensure content is never overlapped by the fixed bottom nav bar */
+  .pos-main-container,
+  .billing-desk-layout,
+  .sales-reports-container {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 16px)) !important;
+  }
+}
+
+/* ==========================================================================
+   HEADER STATUS STRIP & BADGES
+   ========================================================================== */
+
+.header-status-strip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.status-badges-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.terminal-pill-badge,
+.network-pill-badge,
+.sync-status-badge,
+.drive-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: #e2e8f0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.terminal-pill-badge {
+  background: #0f766e;
+  border-color: #14b8a6;
+  color: #ffffff;
+}
+
+.network-pill-badge.badge-online {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #a7f3d0;
+}
+
+.network-pill-badge.badge-offline {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.sync-status-badge.badge-synced {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #34d399;
+  color: #6ee7b7;
+}
+
+.sync-status-badge.badge-local {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #60a5fa;
+  color: #93c5fd;
+}
+
+.sync-status-badge.badge-pending {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #fde68a;
+}
+
+.drive-pill-badge.drive-on {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #86efac;
+  color: #86efac;
+}
+
+.drive-pill-badge.drive-off {
+  background: rgba(100, 116, 139, 0.2);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+}
+
+/* ==========================================================================
+   REPORTS & ANALYTICS SECTION STYLING
+   ========================================================================== */
+
+.reports-analytics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.reports-comparative-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.report-distribution-card {
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+}
+
+.dist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dist-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dist-title-wrap h3 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--navy-900, #0f172a);
+  margin: 0;
+}
+
+.dist-icon {
+  color: #059669;
+}
+
+.dist-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #f0fdf4;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.dist-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dist-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dist-divider-v {
+  width: 1px;
+  height: 36px;
+  background: var(--border-light, #e2e8f0);
+}
+
+.dist-label {
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+}
+
+.dist-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--navy-900, #0f172a);
+  font-family: var(--font-mono, monospace);
+}
+
+.dist-sub {
+  font-size: 0.72rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.dist-bar-track {
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid #e2e8f0;
+}
+
+.dist-bar-fill.pc {
+  background: #059669;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.dist-bar-fill.mobile {
+  background: #3b82f6;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.dist-bar-fill.cash {
+  background: #10b981;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.dist-bar-fill.upi {
+  background: #8b5cf6;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Top Products Card */
+.top-products-card {
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+}
+
+.top-products-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  padding-bottom: 8px;
+}
+
+.top-products-header h3 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--navy-900, #0f172a);
+  margin: 0;
+}
+
+.top-p-icon {
+  color: #059669;
+}
+
+.top-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  gap: 10px;
+}
+
+.top-p-rank {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #059669;
+  width: 24px;
+}
+
+.top-p-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-p-name {
+  font-size: 0.88rem;
+  color: var(--navy-900, #0f172a);
+}
+
+.top-p-qty {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+}
+
+.top-p-rev {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #059669;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Terminal Badges in Ledger */
+.terminal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.terminal-tag.tag-pc {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.terminal-tag.tag-mobile {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Customer Info Tag in Ledger & Mobile Cards */
+.customer-info-tag {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+}
+
+.customer-info-tag small {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+}
+
+.mobile-bill-customer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #047857;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.mobile-bill-customer-row .cust-icon {
+  color: #059669;
+}
+
+.dropdown-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

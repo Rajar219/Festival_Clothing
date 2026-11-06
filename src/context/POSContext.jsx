@@ -31,6 +31,19 @@ import {
 } from '../services/googleDrive';
 import { generateReceiptPDF } from '../utils/receiptGenerator';
 import { calculateBillTotals, evaluateCombos, DEFAULT_COMBOS } from '../utils/comboEngine';
+import {
+  getTerminalInfo,
+  getTerminalId,
+  getTerminalType,
+  setTerminalType as saveTerminalType,
+} from '../services/terminal';
+import {
+  syncWithBackend,
+  startBackgroundSync,
+  stopBackgroundSync,
+  subscribeSyncStatus,
+  getSyncState,
+} from '../services/syncService';
 
 export const POSContext = createContext(null);
 
@@ -77,14 +90,6 @@ export function POSProvider({ children }) {
   const [cashReceived, setCashReceived] = useState('');
   const [upiRef, setUpiRef] = useState('');
 
-  // Check Drive connection on mount
-  useEffect(() => {
-    setIsDriveConnected(isGoogleDriveConnected());
-  }, []);
-
-  // Submission lock to prevent duplicate checkouts
-  const isSubmittingRef = useRef(false);
-
   // Toast notifications
   const [toast, setToast] = useState(null);
   const toastTimeoutRef = useRef(null);
@@ -96,6 +101,35 @@ export function POSProvider({ children }) {
       setToast(null);
     }, 3500);
   }, []);
+
+  // Terminal Device Identity (Main PC Cash Counter vs Mobile Floor Terminal)
+  const [terminalInfo, setTerminalInfo] = useState(() => getTerminalInfo());
+
+  const changeTerminalType = useCallback((type) => {
+    saveTerminalType(type);
+    const updated = getTerminalInfo();
+    setTerminalInfo(updated);
+    showToast(`Terminal updated to ${updated.name}`, 'info');
+  }, [showToast]);
+
+  // Cross-Device Sync State
+  const [syncState, setSyncState] = useState(() => getSyncState());
+
+  useEffect(() => {
+    const unsub = subscribeSyncStatus((st) => setSyncState(st));
+    return unsub;
+  }, []);
+
+  // Optional Google Drive Backup Checkbox on Checkout (Default: UNCHECKED)
+  const [alsoUploadToDrive, setAlsoUploadToDrive] = useState(false);
+
+  // Check Drive connection on mount
+  useEffect(() => {
+    setIsDriveConnected(isGoogleDriveConnected());
+  }, []);
+
+  // Submission lock to prevent duplicate checkouts
+  const isSubmittingRef = useRef(false);
 
   // Initialize Data
   useEffect(() => {
@@ -113,6 +147,12 @@ export function POSProvider({ children }) {
         const loadedBills = await getAllBills();
         setAllBills(loadedBills);
         setIsLoadingBills(false);
+
+        // Start background cross-device synchronisation
+        startBackgroundSync(async () => {
+          const refreshed = await getAllBills();
+          setAllBills(refreshed);
+        });
       } catch (err) {
         console.error('Initialization error:', err);
         showToast('Initialization issue: ' + err.message, 'error');
@@ -470,6 +510,7 @@ export function POSProvider({ children }) {
     setPaymentMethod('cash');
     setCashReceived('');
     setUpiRef('');
+    setAlsoUploadToDrive(false);
     setIsCheckoutModalOpen(false);
     setIsSuccessModalOpen(false);
     setIsPrintPreviewOpen(false);
@@ -486,6 +527,23 @@ export function POSProvider({ children }) {
       console.error('Failed to reload bills:', err);
     }
   }, []);
+
+  // Manual Trigger for Cross-Device Sync
+  const triggerManualSync = useCallback(async () => {
+    showToast('Syncing with central database...', 'info');
+    const res = await syncWithBackend();
+    const refreshed = await getAllBills();
+    setAllBills(refreshed);
+    if (res?.status === 'success') {
+      showToast(`Cross-device sync complete! (${refreshed.length} total bills)`, 'success');
+    } else if (res?.status === 'unconfigured') {
+      showToast('Central database not yet connected in Vercel. Operating in local-first mode.', 'warning');
+    } else if (res?.status === 'offline') {
+      showToast('Device is offline. Pending bills will sync when reconnected.', 'warning');
+    } else {
+      showToast('Sync notice: ' + (res?.error || 'Could not reach server'), 'warning');
+    }
+  }, [showToast]);
 
   // Finalize Checkout (Cash or UPI)
   const finalizeCheckout = useCallback(
@@ -573,12 +631,35 @@ export function POSProvider({ children }) {
         };
 
         // Step 2: Persist atomically to IndexedDB FIRST
-        const savedBill = await saveFinalizedBill(finalizedBill, currentUserName, userRole);
+        const savedBill = await saveFinalizedBill({
+          ...finalizedBill,
+          terminalId: terminalInfo.terminalId,
+          terminalType: terminalInfo.terminalType,
+          alsoUploadToDrive: paymentDetails.alsoUploadToDrive !== undefined ? Boolean(paymentDetails.alsoUploadToDrive) : Boolean(alsoUploadToDrive),
+        }, currentUserName, userRole);
 
         // Update in-memory state and history
         setLastFinalizedBill(savedBill);
         setBillToPrint(savedBill);
         await refreshBills();
+
+        // Background Step 1: Immediately sync with central Neon PostgreSQL
+        syncWithBackend().catch((e) => console.warn('Background sync trigger:', e));
+
+        // Background Step 2: Optional Google Drive upload ONLY if explicitly checked
+        const shouldUploadDrive = paymentDetails.alsoUploadToDrive !== undefined
+          ? Boolean(paymentDetails.alsoUploadToDrive)
+          : Boolean(alsoUploadToDrive);
+
+        if (shouldUploadDrive && isGoogleDriveConnected()) {
+          (async () => {
+            try {
+              await manualSaveBillToDrive(savedBill);
+            } catch (driveErr) {
+              console.warn('Optional Drive upload notice:', driveErr);
+            }
+          })();
+        }
 
         // Clear active cart items now that bill is safely saved
         setItems([]);
@@ -1013,6 +1094,12 @@ export function POSProvider({ children }) {
     allBills,
     refreshBills,
     isLoadingBills,
+    terminalInfo,
+    changeTerminalType,
+    syncState,
+    triggerManualSync,
+    alsoUploadToDrive,
+    setAlsoUploadToDrive,
     cancelBill,
     deleteBill,
     triggerPrint,

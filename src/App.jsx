@@ -12,6 +12,7 @@ import { SalesReportsView } from './components/SalesReportsView';
 import { ProductManagementView } from './components/ProductManagementView';
 import { SettingsView } from './components/SettingsView';
 import { ReceiptPrintView } from './components/ReceiptPrintView';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { COMPANY_BRANDING } from './services/db';
 import { AlertCircle, CheckCircle, Info, Sparkles } from 'lucide-react';
@@ -90,6 +91,9 @@ export function App() {
           <ReceiptPrintView bill={billToPrint} mode={activePrintMode} />
         )}
       </div>
+
+      {/* Premium Mobile Bottom Navigation Dock */}
+      <MobileBottomNav />
 
       {/* Toast Notification Banner */}
       {toast && (

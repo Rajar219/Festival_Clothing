@@ -1200,11 +1200,13 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('Total Discount');
     expect(pdfText).toContain('Final Payable Amount');
 
-    // Check Footer messages
-    expect(pdfText).toContain('Thank you for shopping with FESTIVAL CLOTHING!');
-    expect(pdfText).toContain('We appreciate your purchase.');
-    expect(pdfText).toContain('FESTIVAL CLOTHING - MENSWEAR');
+    // Check Redesigned Footer messages
+    expect(pdfText).toContain('THANK YOU FOR SHOPPING WITH US!');
+    expect(pdfText).toContain('We truly appreciate your support.');
+    expect(pdfText).toContain('FESTIVAL CLOTHING');
+    expect(pdfText).toContain('MENSWEAR');
     expect(pdfText).not.toContain('WISDO TECH');
+    expect(pdfText).not.toContain('Goods once sold can be exchanged');
   });
 
   // Scenario 20: WhatsApp invoice message format contains prompt greeting & order summary
@@ -1311,10 +1313,11 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('FINAL PAYABLE:');
     expect(pdfText).toContain('Rs. 2100.00');
 
-    // Footer
-    expect(pdfText).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
-    expect(pdfText).toContain('We appreciate your support. Visit us again!');
+    // Footer (Clean Redesigned Thank You Footer, Zero Exchange Policy, Zero WISDO TECH)
+    expect(pdfText).toContain('THANK YOU FOR SHOPPING WITH US!');
+    expect(pdfText).toContain('We truly appreciate your support.');
     expect(pdfText).not.toContain('WISDO TECH');
+    expect(pdfText).not.toContain('Goods once sold can be exchanged');
   });
 
   // Test 22: Scenario A - Normal billing: Validate, calculate, and save bill locally FIRST

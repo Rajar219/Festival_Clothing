@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR, formatDateTime } from '../utils/currency';
+import { getBillFestiveQuote } from '../services/db';
 
 export function ReceiptPrintView({ bill, mode = 'thermal' }) {
   if (!bill) return null;
@@ -9,15 +10,17 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
     subtitle: 'MENSWEAR',
     address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
     phone: '',
-    receiptFooter: 'Wishing you a Happy & Prosperous Diwali! Exchanges accepted within 7 days with bill in original condition.',
+    receiptFooter: 'Wishing you a Happy & Prosperous Celebration!',
   };
+
+  const festiveQuote = getBillFestiveQuote(bill);
 
   const isThermal = mode === 'thermal';
 
   if (isThermal) {
     return (
       <div className="printable-receipt thermal-receipt">
-        {/* Header with configured shop name and WISDO TECH attribution */}
+        {/* Header with configured shop name */}
         <div className="receipt-header">
           <h1 className="receipt-store-name">{store.name}</h1>
           <h2 className="receipt-subtitle">{store.subtitle}</h2>
@@ -162,11 +165,12 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
 
         <div className="receipt-divider-dashed" />
 
-        {/* Footer with Customer Thank You */}
+        {/* Footer with Customer Thank You & Rotating Festive Quote */}
         <div className="receipt-footer">
-          <p className="thank-you-msg">Thanks for purchasing from FESTIVAL CLOTHING!</p>
-          <p className="thank-you-submsg">We appreciate your support. Visit us again!</p>
-          <p className="footer-custom-text">• Goods once sold can be exchanged within 7 days with this bill in original condition.</p>
+          <p className="thank-you-msg">THANK YOU FOR SHOPPING WITH US!</p>
+          <p className="thank-you-submsg">We truly appreciate your support.</p>
+          <p className="footer-festive-quote">"{festiveQuote}"</p>
+          <p className="footer-brand-title">FESTIVAL CLOTHING — MENSWEAR</p>
         </div>
       </div>
     );
@@ -272,11 +276,10 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       {/* Order Summary & Terms */}
       <div className="a4-summary-footer-grid">
         <div className="a4-terms-box">
-          <h4>Terms & Conditions:</h4>
+          <h4>Customer Notice:</h4>
           <ul>
-            <li>Goods once sold can be exchanged within 7 days with this original bill.</li>
-            <li>Items must be unwashed, unworn, and retain all original retail tags.</li>
-            <li>{store.receiptFooter}</li>
+            <li>Thank you for visiting Festival Clothing Menswear.</li>
+            <li>We truly appreciate your valued business and support.</li>
           </ul>
         </div>
 
@@ -337,12 +340,13 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       </div>
 
       <div className="a4-footer-thanks">
-        <p className="a4-thanks-main">Thanks for purchasing from FESTIVAL CLOTHING!</p>
-        <p className="a4-thanks-sub">We appreciate your support. Visit us again!</p>
+        <p className="a4-thanks-main">THANK YOU FOR SHOPPING WITH US!</p>
+        <p className="a4-thanks-sub">We truly appreciate your support.</p>
+        <p className="a4-festive-quote">"{festiveQuote}"</p>
       </div>
 
       <div className="a4-company-attribution">
-        <strong>FESTIVAL CLOTHING - MENSWEAR</strong>
+        <strong>FESTIVAL CLOTHING — MENSWEAR</strong>
       </div>
     </div>
   );

@@ -35,6 +35,13 @@ import {
   Send,
   Cloud,
   CheckCircle2,
+  Smartphone,
+  Laptop,
+  TrendingUp,
+  ShoppingBag,
+  Tag,
+  User,
+  Phone,
 } from 'lucide-react';
 
 export function SalesReportsView({ defaultTab = 'history' }) {
@@ -61,7 +68,9 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'completed' | 'cancelled'
+  const [terminalFilter, setTerminalFilter] = useState('all'); // 'all' | 'PC' | 'MOBILE'
+  const [paymentFilter, setPaymentFilter] = useState('all'); // 'all' | 'cash' | 'upi'
 
   const [selectedBill, setSelectedBill] = useState(null);
   const [whatsAppBill, setWhatsAppBill] = useState(null);
@@ -69,6 +78,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
   const [billToDelete, setBillToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDownloadBillPDF = (bill) => {
     try {
@@ -78,7 +88,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       showToast('Failed to generate PDF: ' + err.message, 'error');
     }
   };
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const activeReportsModal = Boolean(selectedBill || billToCancel || billToDelete);
   const handleCloseActiveModal = () => {
@@ -95,6 +104,8 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     isDestructive: Boolean(billToDelete || billToCancel),
   });
 
+  // Time boundaries (Local timezone)
+  const now = new Date();
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -122,6 +133,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     return d.getTime();
   }, []);
 
+  // Filtered bills based on all criteria
   const filteredBills = useMemo(() => {
     return allBills.filter((bill) => {
       const billTime = new Date(bill.createdAt).getTime();
@@ -136,6 +148,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       if (statusFilter === 'completed' && bill.status !== 'completed') return false;
       if (statusFilter === 'cancelled' && bill.status !== 'cancelled') return false;
 
+      if (terminalFilter !== 'all') {
+        const bTerm = (bill.terminalType || 'PC').toUpperCase();
+        if (terminalFilter.toUpperCase() !== bTerm) return false;
+      }
+
+      if (paymentFilter !== 'all') {
+        if ((bill.paymentMethod || 'cash').toLowerCase() !== paymentFilter.toLowerCase()) return false;
+      }
+
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchNumber = bill.billNumber.toLowerCase().includes(query);
@@ -146,15 +167,25 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
       return true;
     });
-  }, [allBills, dateFilter, statusFilter, searchTerm, todayStart, yesterdayStart, weekStart, monthStart]);
+  }, [allBills, dateFilter, statusFilter, terminalFilter, paymentFilter, searchTerm, todayStart, yesterdayStart, weekStart, monthStart]);
 
-  // Aggregate stats strictly using stored finalized transaction amounts
+  // Comprehensive Sales Metrics & Parity Analytics
   const stats = useMemo(() => {
     let totalSales = 0;
     let cashTotal = 0;
     let upiTotal = 0;
     let validCount = 0;
     let cancelledCount = 0;
+    let totalDiscounts = 0;
+    let totalComboSavings = 0;
+    let totalUnitsSold = 0;
+
+    let pcSales = 0;
+    let pcCount = 0;
+    let mobileSales = 0;
+    let mobileCount = 0;
+
+    const productSalesMap = {};
 
     for (const b of filteredBills) {
       if (b.status === 'cancelled') {
@@ -163,15 +194,69 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       }
 
       validCount++;
-      const billAmount = b.finalPayableAmount || 0;
+      const billAmount = Number(b.finalPayableAmount) || 0;
       totalSales += billAmount;
+      totalDiscounts += Number(b.totalReduction) || 0;
+      totalComboSavings += Number(b.comboSavings) || 0;
 
       if (b.paymentMethod === 'cash') {
         cashTotal += billAmount;
       } else if (b.paymentMethod === 'upi') {
         upiTotal += billAmount;
       }
+
+      const term = (b.terminalType || 'PC').toUpperCase();
+      if (term === 'MOBILE') {
+        mobileSales += billAmount;
+        mobileCount++;
+      } else {
+        pcSales += billAmount;
+        pcCount++;
+      }
+
+      // Aggregate item quantities
+      (b.items || []).forEach((it) => {
+        const qty = Number(it.qty) || 0;
+        totalUnitsSold += qty;
+        const pKey = it.name || it.productId || 'Item';
+        if (!productSalesMap[pKey]) {
+          productSalesMap[pKey] = { name: pKey, qty: 0, revenue: 0 };
+        }
+        productSalesMap[pKey].qty += qty;
+        productSalesMap[pKey].revenue += Number(it.lineTotal) || 0;
+      });
     }
+
+    // Historical fixed milestones across ALL bills (independent of active filter)
+    let todaySales = 0;
+    let todayCount = 0;
+    let yesterdaySales = 0;
+    let yesterdayCount = 0;
+    let monthSales = 0;
+    let monthCount = 0;
+
+    for (const b of allBills) {
+      if (b.status === 'cancelled') continue;
+      const bTime = new Date(b.createdAt).getTime();
+      const amt = Number(b.finalPayableAmount) || 0;
+
+      if (bTime >= todayStart) {
+        todaySales += amt;
+        todayCount++;
+      } else if (bTime >= yesterdayStart && bTime < todayStart) {
+        yesterdaySales += amt;
+        yesterdayCount++;
+      }
+
+      if (bTime >= monthStart) {
+        monthSales += amt;
+        monthCount++;
+      }
+    }
+
+    const topProducts = Object.values(productSalesMap)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
 
     return {
       totalSales,
@@ -179,8 +264,23 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       upiTotal,
       validCount,
       cancelledCount,
+      totalDiscounts,
+      totalComboSavings,
+      totalCustomerSavings: totalDiscounts + totalComboSavings,
+      totalUnitsSold,
+      pcSales,
+      pcCount,
+      mobileSales,
+      mobileCount,
+      todaySales,
+      todayCount,
+      yesterdaySales,
+      yesterdayCount,
+      monthSales,
+      monthCount,
+      topProducts,
     };
-  }, [filteredBills]);
+  }, [filteredBills, allBills, todayStart, yesterdayStart, monthStart]);
 
   // Helper to trigger file download
   const downloadFile = (content, filename, mimeType = 'text/csv;charset=utf-8;') => {
@@ -194,19 +294,17 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     document.body.removeChild(link);
   };
 
-  // 1. Export Item-Level CSV (One row per line item, with bill_id for grouping in Pandas)
+  // 1. Export Item-Level CSV
   const handleExportLineItemsCSV = () => {
     if (!isAdmin) {
       showToast('Admin access required to export sales data.', 'error');
       setIsAdminAuthModalOpen(true);
       return;
     }
-
     if (filteredBills.length === 0) {
       showToast('No bills available in selected date range.', 'error');
       return;
     }
-
     try {
       const csv = exportLineItemsCSV(filteredBills, settings.shopName);
       const dateTag = dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'Last7Days' : 'Filtered';
@@ -217,19 +315,17 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     }
   };
 
-  // 2. Export Bills Summary CSV (One row per bill, avoiding double-counting totals)
+  // 2. Export Bills Summary CSV
   const handleExportSummaryCSV = () => {
     if (!isAdmin) {
       showToast('Admin access required to export sales data.', 'error');
       setIsAdminAuthModalOpen(true);
       return;
     }
-
     if (filteredBills.length === 0) {
       showToast('No bills available in selected date range.', 'error');
       return;
     }
-
     try {
       const csv = exportBillsSummaryCSV(filteredBills, settings.shopName);
       const dateTag = dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'Last7Days' : 'Filtered';
@@ -240,31 +336,13 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     }
   };
 
-  // 3. Export Products Catalog CSV
-  const handleExportProductsCSV = () => {
-    if (!isAdmin) {
-      showToast('Admin access required to export products.', 'error');
-      setIsAdminAuthModalOpen(true);
-      return;
-    }
-
-    try {
-      const csv = exportProductsCSV(products);
-      downloadFile(csv, `${settings.shopName.replace(/\s+/g, '_')}_Product_Catalog_${new Date().toISOString().slice(0, 10)}.csv`);
-      showToast('Product Catalog CSV exported.', 'success');
-    } catch (err) {
-      showToast('Export failed: ' + err.message, 'error');
-    }
-  };
-
-  // 4. Full Database Backup (JSON)
+  // 3. Full Database Backup (JSON)
   const handleExportFullBackup = async () => {
     if (!isAdmin) {
       showToast('Admin access required for full system backup.', 'error');
       setIsAdminAuthModalOpen(true);
       return;
     }
-
     try {
       const jsonStr = await exportFullDatabaseBackup();
       downloadFile(jsonStr, `FestivalClothing_FullBackup_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
@@ -290,7 +368,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       showToast('Please state a reason for cancelling this bill.', 'error');
       return;
     }
-
     try {
       setIsCancelling(true);
       await cancelBill(billToCancel.id, cancelReason);
@@ -331,18 +408,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
   return (
     <div className="sales-reports-container">
-      {/* Sub-view Navigation Bar */}
+      {/* Sub-view Navigation Bar (Parity Switcher for Desktop & Mobile) */}
       <div className="subview-tab-bar">
         <button
           type="button"
+          id="btn-subtab-history"
           className={`subview-tab-btn ${activeViewMode === 'history' ? 'active' : ''}`}
           onClick={() => setActiveViewMode('history')}
         >
           <History size={16} />
-          <span>Sales History ({filteredBills.length} Bills)</span>
+          <span>Sales History ({filteredBills.length})</span>
         </button>
         <button
           type="button"
+          id="btn-subtab-reports"
           className={`subview-tab-btn ${activeViewMode === 'reports' ? 'active' : ''}`}
           onClick={() => setActiveViewMode('reports')}
         >
@@ -351,11 +430,11 @@ export function SalesReportsView({ defaultTab = 'history' }) {
         </button>
       </div>
 
-      {/* Prominent Backup Reminder Banner */}
+      {/* Prominent Local-First Storage Notice Banner */}
       <div className="local-storage-reminder-banner">
         <Database size={18} className="banner-icon" />
         <div className="banner-text">
-          <strong>Local-First Storage Notice:</strong> Records are stored in this computer's browser IndexedDB. Clear browser cache or disk issues will erase data without backups. Remember to download a backup regularly.
+          <strong>Local-First Storage Active:</strong> Bills are securely saved in this device's browser database (IndexedDB). Google Drive manual backups and JSON export preserve records permanently.
         </div>
         <button
           type="button"
@@ -364,67 +443,235 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           title="Download complete database backup JSON"
         >
           <Download size={14} />
-          <span>Backup Data Now</span>
+          <span>Backup JSON</span>
         </button>
       </div>
 
-      {/* Reports & Analytics KPI Cards Grid (Rendered prominently in Reports Mode or summary in History) */}
+      {/* ====================================================================
+          MODE 1: REPORTS & ANALYTICS VIEW
+          ==================================================================== */}
       {activeViewMode === 'reports' && (
-        <>
+        <div className="reports-analytics-section">
+          {/* Executive Performance Milestones Cards */}
           <div className="kpi-grid">
+            {/* Today's Sales */}
+            <div className="kpi-card today-kpi">
+              <div className="kpi-icon-box">
+                <TrendingUp size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">Today's Sales</span>
+                <span className="kpi-value">{formatINR(stats.todaySales, true)}</span>
+                <span className="kpi-subtext">{stats.todayCount} bill(s) today</span>
+              </div>
+            </div>
+
+            {/* Yesterday's Sales */}
+            <div className="kpi-card yesterday-kpi">
+              <div className="kpi-icon-box">
+                <History size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">Yesterday's Sales</span>
+                <span className="kpi-value">{formatINR(stats.yesterdaySales, true)}</span>
+                <span className="kpi-subtext">{stats.yesterdayCount} bill(s) yesterday</span>
+              </div>
+            </div>
+
+            {/* Monthly Sales */}
+            <div className="kpi-card month-kpi">
+              <div className="kpi-icon-box">
+                <Calendar size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">This Month</span>
+                <span className="kpi-value">{formatINR(stats.monthSales, true)}</span>
+                <span className="kpi-subtext">{stats.monthCount} bill(s) this month</span>
+              </div>
+            </div>
+
+            {/* Filtered Period Total */}
             <div className="kpi-card total-kpi">
               <div className="kpi-icon-box">
-                <BarChart3 size={24} />
+                <BarChart3 size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">Total Sales ({dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? '7 Days' : 'Filtered'})</span>
+                <span className="kpi-title">Period Revenue ({dateFilter.toUpperCase()})</span>
                 <span className="kpi-value">{formatINR(stats.totalSales, true)}</span>
-                <span className="kpi-subtext">{stats.validCount} finalized bills</span>
+                <span className="kpi-subtext">{stats.validCount} valid bills ({stats.totalUnitsSold} items)</span>
               </div>
             </div>
 
+            {/* Cash Collected */}
             <div className="kpi-card cash-kpi">
               <div className="kpi-icon-box">
-                <Banknote size={24} />
+                <Banknote size={22} />
               </div>
               <div className="kpi-data">
-                <span className="kpi-title">Cash Collected</span>
+                <span className="kpi-title">Cash Collections</span>
                 <span className="kpi-value">{formatINR(stats.cashTotal, true)}</span>
-                <span className="kpi-subtext">Physical drawer currency</span>
+                <span className="kpi-subtext">Physical drawer cash</span>
               </div>
             </div>
 
+            {/* UPI Collected */}
             <div className="kpi-card upi-kpi">
               <div className="kpi-icon-box">
-                <QrCode size={24} />
+                <QrCode size={22} />
               </div>
               <div className="kpi-data">
                 <span className="kpi-title">UPI Digital Collections</span>
                 <span className="kpi-value">{formatINR(stats.upiTotal, true)}</span>
-                <span className="kpi-subtext">Direct to merchant bank</span>
+                <span className="kpi-subtext">Instant bank QR transfers</span>
               </div>
             </div>
 
+            {/* Customer Discounts & Savings */}
+            <div className="kpi-card savings-kpi">
+              <div className="kpi-icon-box">
+                <Tag size={22} />
+              </div>
+              <div className="kpi-data">
+                <span className="kpi-title">Total Customer Savings</span>
+                <span className="kpi-value">{formatINR(stats.totalCustomerSavings, true)}</span>
+                <span className="kpi-subtext">Item reductions + Combo offers</span>
+              </div>
+            </div>
+
+            {/* Cancelled Bills */}
             <div className="kpi-card cancelled-kpi">
               <div className="kpi-icon-box">
-                <Ban size={24} />
+                <Ban size={22} />
               </div>
               <div className="kpi-data">
                 <span className="kpi-title">Voided / Cancelled</span>
                 <span className="kpi-value">{stats.cancelledCount} Bills</span>
-                <span className="kpi-subtext">Audited corrections</span>
+                <span className="kpi-subtext">Audit-preserved voids</span>
               </div>
             </div>
           </div>
 
-          {/* Admin CSV Export Panel for Reports View */}
+          {/* Comparative Distribution Cards: PC vs Mobile & Cash vs UPI */}
+          <div className="reports-comparative-grid">
+            {/* Terminal Breakdown: PC vs Mobile Handheld */}
+            <div className="report-distribution-card">
+              <div className="dist-header">
+                <div className="dist-title-wrap">
+                  <Laptop size={18} className="dist-icon" />
+                  <h3>Terminal Breakdown (PC vs Mobile)</h3>
+                </div>
+                <span className="dist-badge">Active Range</span>
+              </div>
+
+              <div className="dist-stats-row">
+                <div className="dist-col">
+                  <span className="dist-label">PC Counter Terminal</span>
+                  <span className="dist-value">{formatINR(stats.pcSales, true)}</span>
+                  <span className="dist-sub">{stats.pcCount} bills</span>
+                </div>
+                <div className="dist-divider-v" />
+                <div className="dist-col">
+                  <span className="dist-label">Mobile Floor Handheld</span>
+                  <span className="dist-value">{formatINR(stats.mobileSales, true)}</span>
+                  <span className="dist-sub">{stats.mobileCount} bills</span>
+                </div>
+              </div>
+
+              {/* Visual Split Bar */}
+              <div className="dist-bar-track">
+                <div
+                  className="dist-bar-fill pc"
+                  style={{
+                    width: stats.totalSales > 0 ? `${(stats.pcSales / stats.totalSales) * 100}%` : '50%',
+                  }}
+                  title={`PC: ${stats.totalSales > 0 ? Math.round((stats.pcSales / stats.totalSales) * 100) : 0}%`}
+                />
+                <div
+                  className="dist-bar-fill mobile"
+                  style={{
+                    width: stats.totalSales > 0 ? `${(stats.mobileSales / stats.totalSales) * 100}%` : '50%',
+                  }}
+                  title={`Mobile: ${stats.totalSales > 0 ? Math.round((stats.mobileSales / stats.totalSales) * 100) : 0}%`}
+                />
+              </div>
+            </div>
+
+            {/* Payment Method Distribution: Cash vs UPI */}
+            <div className="report-distribution-card">
+              <div className="dist-header">
+                <div className="dist-title-wrap">
+                  <Banknote size={18} className="dist-icon" />
+                  <h3>Payment Split (Cash vs UPI)</h3>
+                </div>
+                <span className="dist-badge">Collections</span>
+              </div>
+
+              <div className="dist-stats-row">
+                <div className="dist-col">
+                  <span className="dist-label">Cash Tender</span>
+                  <span className="dist-value">{formatINR(stats.cashTotal, true)}</span>
+                  <span className="dist-sub">
+                    {stats.totalSales > 0 ? `${Math.round((stats.cashTotal / stats.totalSales) * 100)}%` : '0%'}
+                  </span>
+                </div>
+                <div className="dist-divider-v" />
+                <div className="dist-col">
+                  <span className="dist-label">UPI Digital</span>
+                  <span className="dist-value">{formatINR(stats.upiTotal, true)}</span>
+                  <span className="dist-sub">
+                    {stats.totalSales > 0 ? `${Math.round((stats.upiTotal / stats.totalSales) * 100)}%` : '0%'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Visual Split Bar */}
+              <div className="dist-bar-track">
+                <div
+                  className="dist-bar-fill cash"
+                  style={{
+                    width: stats.totalSales > 0 ? `${(stats.cashTotal / stats.totalSales) * 100}%` : '50%',
+                  }}
+                />
+                <div
+                  className="dist-bar-fill upi"
+                  style={{
+                    width: stats.totalSales > 0 ? `${(stats.upiTotal / stats.totalSales) * 100}%` : '50%',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Product Sales Performance Ranking */}
+          {stats.topProducts.length > 0 && (
+            <div className="top-products-card">
+              <div className="top-products-header">
+                <Package size={18} className="top-p-icon" />
+                <h3>Top Selling Items & Bundles</h3>
+              </div>
+              <div className="top-products-list">
+                {stats.topProducts.map((p, idx) => (
+                  <div key={idx} className="top-product-row">
+                    <span className="top-p-rank">#{idx + 1}</span>
+                    <div className="top-p-info">
+                      <strong className="top-p-name">{p.name}</strong>
+                      <span className="top-p-qty">{p.qty} units sold</span>
+                    </div>
+                    <span className="top-p-rev">{formatINR(p.revenue, true)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Admin CSV Export Panel */}
           <div className="reports-export-banner">
             <div className="export-banner-info">
               <FileSpreadsheet size={22} className="export-banner-icon" />
               <div>
-                <h3 className="export-banner-title">Excel & Python Pandas Sales Exports</h3>
+                <h3 className="export-banner-title">Accounting & Data Exports (Excel / CSV)</h3>
                 <p className="export-banner-subtitle">
-                  Export formatted UTF-8 CSVs with ISO timestamps, numeric floats, and stable bill identifiers.
+                  Download structured sales logs for offline tax preparation, spreadsheet reporting, or backup storage.
                 </p>
               </div>
             </div>
@@ -433,34 +680,35 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 type="button"
                 className="btn-export-csv"
                 onClick={handleExportLineItemsCSV}
-                title="Export item-level sales CSV with stable bill_id for Python Pandas and Excel PivotTables"
               >
                 <Download size={15} />
-                <span>Export Items CSV (Pandas)</span>
+                <span>Line Items CSV</span>
               </button>
-
               <button
                 type="button"
                 className="btn-export-csv secondary"
                 onClick={handleExportSummaryCSV}
-                title="Export bills summary CSV (one row per bill) avoiding double-counted totals"
               >
                 <Download size={15} />
-                <span>Bills Summary CSV (Excel)</span>
+                <span>Bills Summary CSV</span>
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Control Bar: Filters & Export Actions */}
+      {/* ====================================================================
+          MODE 2: SALES HISTORY VIEW
+          ==================================================================== */}
+      {/* Control Bar: Filters & Export Actions (Visible in both, with focus on History) */}
       <div className="reports-control-bar">
         <div className="search-filter-group">
+          {/* Text Search */}
           <div className="search-input-wrap">
             <Search size={18} className="search-icon" />
             <input
               type="text"
-              placeholder="Search Bill #, Customer Name, Mobile..."
+              placeholder="Search Bill #, Customer Name, Phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -472,32 +720,38 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             )}
           </div>
 
+          {/* Date Filter Tabs */}
           <div className="date-filter-tabs">
             <button
+              type="button"
               className={`date-tab ${dateFilter === 'today' ? 'active' : ''}`}
               onClick={() => setDateFilter('today')}
             >
               Today
             </button>
             <button
+              type="button"
               className={`date-tab ${dateFilter === 'yesterday' ? 'active' : ''}`}
               onClick={() => setDateFilter('yesterday')}
             >
               Yesterday
             </button>
             <button
+              type="button"
               className={`date-tab ${dateFilter === 'week' ? 'active' : ''}`}
               onClick={() => setDateFilter('week')}
             >
               7 Days
             </button>
             <button
+              type="button"
               className={`date-tab ${dateFilter === 'month' ? 'active' : ''}`}
               onClick={() => setDateFilter('month')}
             >
               This Month
             </button>
             <button
+              type="button"
               className={`date-tab ${dateFilter === 'all' ? 'active' : ''}`}
               onClick={() => setDateFilter('all')}
             >
@@ -505,41 +759,47 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             </button>
           </div>
 
-          <select
-            className="status-filter-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Bills</option>
-            <option value="completed">Active Bills Only</option>
-            <option value="cancelled">Cancelled Bills Only</option>
-          </select>
+          {/* Dropdown Filters Group */}
+          <div className="dropdown-filters-row">
+            {/* Terminal Filter: PC vs Mobile */}
+            <select
+              className="status-filter-select"
+              value={terminalFilter}
+              onChange={(e) => setTerminalFilter(e.target.value)}
+              title="Filter by originating terminal"
+            >
+              <option value="all">All Terminals</option>
+              <option value="PC">PC Counter</option>
+              <option value="MOBILE">Mobile Handheld</option>
+            </select>
+
+            {/* Payment Method Filter */}
+            <select
+              className="status-filter-select"
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value)}
+              title="Filter by payment method"
+            >
+              <option value="all">All Payments</option>
+              <option value="cash">Cash Only</option>
+              <option value="upi">UPI Only</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              className="status-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              title="Filter by status"
+            >
+              <option value="all">All Bills</option>
+              <option value="completed">Active Bills Only</option>
+              <option value="cancelled">Cancelled Bills Only</option>
+            </select>
+          </div>
         </div>
 
         <div className="reports-actions">
-          {/* Admin Export Dropdown / Buttons */}
-          <div className="export-button-group">
-            <button
-              type="button"
-              className="btn-export-csv"
-              onClick={handleExportLineItemsCSV}
-              title="Export item-level sales CSV with stable bill_id for Python Pandas and Excel PivotTables"
-            >
-              <FileSpreadsheet size={15} />
-              <span>Export Items CSV</span>
-            </button>
-
-            <button
-              type="button"
-              className="btn-export-csv secondary"
-              onClick={handleExportSummaryCSV}
-              title="Export bills summary CSV (one row per bill) avoiding double-counted totals"
-            >
-              <FileSpreadsheet size={15} />
-              <span>Bills Summary CSV</span>
-            </button>
-          </div>
-
           <button
             type="button"
             className="btn-refresh-grid"
@@ -547,11 +807,12 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             title="Refresh database records"
           >
             <RotateCcw size={16} />
+            <span className="desktop-only">Refresh</span>
           </button>
         </div>
       </div>
 
-      {/* Ledger Table */}
+      {/* Ledger Cards & Table Container */}
       <div className="ledger-card">
         {/* Desktop View: Wide Ledger Table (>= 768px) */}
         <div className="ledger-scroll-container desktop-ledger-view">
@@ -560,10 +821,12 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <tr>
                 <th>Bill Number</th>
                 <th>Date & Time</th>
+                <th>Terminal</th>
                 <th>Cashier</th>
+                <th>Customer</th>
                 <th>Items Summary</th>
-                <th className="text-right">Subtotal</th>
-                <th className="text-center">Reduction</th>
+                <th className="text-right">Original</th>
+                <th className="text-center">Discount</th>
                 <th className="text-right">Final Amount</th>
                 <th className="text-center">Payment</th>
                 <th className="text-center">Status</th>
@@ -573,14 +836,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <tbody>
               {filteredBills.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center empty-ledger-cell">
+                  <td colSpan={12} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
-                    <p>No bills found for the selected filter.</p>
+                    <p>No bills found for the selected filter criteria.</p>
                   </td>
                 </tr>
               ) : (
                 filteredBills.map((bill) => {
                   const isCancelled = bill.status === 'cancelled';
+                  const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
 
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
@@ -591,7 +855,23 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         <span className="timestamp-text">{formatDateTime(bill.createdAt)}</span>
                       </td>
                       <td>
+                        <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
+                          {isMobileTerminal ? <Smartphone size={12} /> : <Laptop size={12} />}
+                          <span>{isMobileTerminal ? 'Mobile' : 'PC'}</span>
+                        </span>
+                      </td>
+                      <td>
                         <span className="cashier-tag">{bill.cashierName || 'Cashier'}</span>
+                      </td>
+                      <td>
+                        {bill.customerName ? (
+                          <div className="customer-info-tag">
+                            <span>{bill.customerName}</span>
+                            {bill.customerPhone && <small>{bill.customerPhone}</small>}
+                          </div>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
                       </td>
                       <td>
                         <span className="items-summary-text">
@@ -599,36 +879,36 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         </span>
                       </td>
                       <td className="text-right">
-                        <span>{formatINR(bill.subtotal, true)}</span>
+                        <span className="text-muted">₹{bill.subtotal || bill.finalPayableAmount}</span>
                       </td>
                       <td className="text-center">
-                        {bill.totalReduction > 0 ? (
-                          <span className="reduction-count-badge">
-                            -₹{bill.totalReduction}
+                        {(bill.totalReduction > 0 || bill.comboSavings > 0) ? (
+                          <span className="reduction-badge">
+                            -₹{(bill.totalReduction || 0) + (bill.comboSavings || 0)}
                           </span>
                         ) : (
-                          <span className="no-reduction">-</span>
+                          <span className="text-muted">—</span>
                         )}
                       </td>
                       <td className="text-right">
-                        <strong className={`ledger-amount ${isCancelled ? 'struck' : ''}`}>
+                        <strong className={`final-amount-text ${isCancelled ? 'struck' : ''}`}>
                           {formatINR(bill.finalPayableAmount, true)}
                         </strong>
                       </td>
                       <td className="text-center">
-                        <span className={`badge-payment-sm ${bill.paymentMethod}`}>
+                        <span className={`badge-payment ${bill.paymentMethod}`}>
                           {bill.paymentMethod.toUpperCase()}
                         </span>
                       </td>
                       <td className="text-center">
                         {isCancelled ? (
-                          <span className="badge-status cancelled">CANCELLED</span>
+                          <span className="badge-status cancelled" title={bill.cancelReason}>VOIDED</span>
                         ) : (
-                          <span className="badge-status paid">COMPLETED</span>
+                          <span className="badge-status paid">PAID</span>
                         )}
                       </td>
                       <td className="text-center">
-                        <div className="ledger-action-btns">
+                        <div className="action-buttons-cell">
                           <button
                             type="button"
                             className="btn-icon-action view"
@@ -650,7 +930,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                             type="button"
                             className="btn-icon-action download"
                             onClick={() => handleDownloadBillPDF(bill)}
-                            title="Download Thermal A4 PDF"
+                            title="Download A4 PDF"
                           >
                             <Download size={15} />
                           </button>
@@ -658,7 +938,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                             type="button"
                             className="btn-icon-action print"
                             onClick={() => triggerPrint(bill, 'thermal')}
-                            title="Reprint receipt"
+                            title="Reprint thermal receipt"
                           >
                             <Printer size={15} />
                           </button>
@@ -690,42 +970,62 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           </table>
         </div>
 
-        {/* Mobile View: Stacked Transaction Cards (< 768px) */}
+        {/* Mobile View: Stacked Responsive Bill Cards (< 768px) */}
         <div className="mobile-ledger-cards">
           {filteredBills.length === 0 ? (
             <div className="mobile-empty-ledger">
               <AlertTriangle size={32} className="empty-alert-icon" />
-              <p>No bills found for the selected filter.</p>
+              <p>No bills found for the selected filter criteria.</p>
             </div>
           ) : (
             filteredBills.map((bill) => {
               const isCancelled = bill.status === 'cancelled';
+              const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
+              const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
 
               return (
                 <div key={bill.id} className={`mobile-bill-card ${isCancelled ? 'card-cancelled' : ''}`}>
+                  {/* Card Header */}
                   <div className="mobile-bill-header">
                     <div className="mobile-bill-number-row">
                       <strong className="mobile-bill-num">{bill.billNumber}</strong>
+                      <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
+                        {isMobileTerminal ? <Smartphone size={11} /> : <Laptop size={11} />}
+                        <span>{isMobileTerminal ? 'Mobile' : 'PC'}</span>
+                      </span>
                       {isCancelled ? (
-                        <span className="badge-status cancelled">CANCELLED</span>
+                        <span className="badge-status cancelled">VOIDED</span>
                       ) : (
-                        <span className="badge-status paid">COMPLETED</span>
+                        <span className="badge-status paid">PAID</span>
                       )}
                     </div>
                     <span className="mobile-bill-time">{formatDateTime(bill.createdAt)}</span>
                   </div>
 
+                  {/* Customer Info (if available) */}
+                  {(bill.customerName || bill.customerPhone) && (
+                    <div className="mobile-bill-customer-row">
+                      <User size={12} className="cust-icon" />
+                      <span>{bill.customerName || 'Customer'}</span>
+                      {bill.customerPhone && (
+                        <span className="mobile-bill-phone">({bill.customerPhone})</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Items Summary */}
                   <div className="mobile-bill-items-row">
                     <span className="mobile-bill-items-text">
                       {(bill.items || []).map((i) => `${i.name} (×${i.qty})`).join(', ')}
                     </span>
                   </div>
 
+                  {/* Financial Amounts & Payment Tag */}
                   <div className="mobile-bill-financials-row">
                     <div className="mobile-bill-amounts">
-                      {bill.totalReduction > 0 && (
+                      {totalSavings > 0 && (
                         <span className="mobile-bill-sub-reduction">
-                          Orig: ₹{bill.subtotal} • Saved: -₹{bill.totalReduction}
+                          Orig: ₹{bill.subtotal || bill.finalPayableAmount} • Saved: -₹{totalSavings}
                         </span>
                       )}
                       <span className={`mobile-bill-final ${isCancelled ? 'struck' : ''}`}>
@@ -734,13 +1034,14 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                     </div>
 
                     <div className="mobile-bill-tags">
-                      <span className={`badge-payment-sm ${bill.paymentMethod}`}>
-                        {bill.paymentMethod.toUpperCase()}
+                      <span className={`badge-payment-sm ${bill.paymentMethod || 'cash'}`}>
+                        {(bill.paymentMethod || 'cash').toUpperCase()}
                       </span>
                       <span className="mobile-cashier-pill">{bill.cashierName || 'Cashier'}</span>
                     </div>
                   </div>
 
+                  {/* Action Buttons: View, WhatsApp, PDF, Print, Void, Delete */}
                   <div className="mobile-bill-actions-row">
                     <button
                       type="button"
@@ -794,7 +1095,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                       type="button"
                       className="mobile-bill-action-btn delete"
                       onClick={() => handleAttemptDelete(bill)}
-                      title="Delete bill"
+                      title="Delete bill permanently"
                     >
                       <Trash2 size={15} />
                       <span>Delete</span>
@@ -836,6 +1137,17 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 </div>
               )}
 
+              {/* Customer Info in Modal */}
+              {(selectedBill.customerName || selectedBill.customerPhone) && (
+                <div className="customer-modal-banner">
+                  <User size={15} />
+                  <span>Customer: <strong>{selectedBill.customerName || 'N/A'}</strong></span>
+                  {selectedBill.customerPhone && (
+                    <span> • Phone: <strong>{selectedBill.customerPhone}</strong></span>
+                  )}
+                </div>
+              )}
+
               <div className="details-items-card">
                 <h3>Items Purchased</h3>
                 <table className="details-items-table">
@@ -873,9 +1185,10 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
               <div className="details-totals-grid">
                 <div className="payment-meta-box">
-                  <h4>Payment & Storage Status</h4>
-                  <p><strong>Payment Mode:</strong> {selectedBill.paymentMethod.toUpperCase()}</p>
+                  <h4>Payment & Storage Details</h4>
+                  <p><strong>Payment Mode:</strong> {(selectedBill.paymentMethod || 'cash').toUpperCase()}</p>
                   <p><strong>Cashier:</strong> {selectedBill.cashierName || 'Cashier'}</p>
+                  <p><strong>Terminal:</strong> {(selectedBill.terminalType || 'PC').toUpperCase() === 'MOBILE' ? 'Mobile Handheld' : 'PC Counter'}</p>
                   {selectedBill.amountReceived > 0 && (
                     <p><strong>Amount Received:</strong> {formatINR(selectedBill.amountReceived, true)}</p>
                   )}
@@ -885,28 +1198,27 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   {selectedBill.upiRef && (
                     <p><strong>UPI Ref:</strong> {selectedBill.upiRef}</p>
                   )}
-                  <p><strong>Local Storage:</strong> Saved (WisdoFestivalPOS_DB)</p>
-                  <p>
-                    <strong>Google Drive Status:</strong>{' '}
-                    {selectedBill.driveUploadStatus === 'uploaded' ? (
-                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                        Backed up ({selectedBill.driveFolderName || 'PC BILLING'})
-                      </span>
-                    ) : (
-                      <span style={{ color: '#d97706' }}>Drive backup pending</span>
-                    )}
-                  </p>
+                  <p><strong>Database:</strong> Stored locally (WisdoFestivalPOS_DB)</p>
+                  {selectedBill.festiveQuote && (
+                    <p><strong>Invoice Quote:</strong> <em>"{selectedBill.festiveQuote}"</em></p>
+                  )}
                 </div>
 
                 <div className="totals-summary-box">
                   <div className="totals-row">
                     <span>Subtotal:</span>
-                    <span>{formatINR(selectedBill.subtotal, true)}</span>
+                    <span>{formatINR(selectedBill.subtotal || selectedBill.finalPayableAmount, true)}</span>
                   </div>
                   {selectedBill.totalReduction > 0 && (
                     <div className="totals-row disc">
                       <span>Total Item Reductions:</span>
                       <span>-{formatINR(selectedBill.totalReduction, true)}</span>
+                    </div>
+                  )}
+                  {selectedBill.comboSavings > 0 && (
+                    <div className="totals-row disc">
+                      <span>Combo Savings:</span>
+                      <span>-{formatINR(selectedBill.comboSavings, true)}</span>
                     </div>
                   )}
                   <div className="totals-row grand">
@@ -1098,6 +1410,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           </div>
         </div>
       )}
+
       {/* WhatsApp Modal for Retrying / Sharing Historical Bills */}
       <WhatsAppModal
         isOpen={Boolean(whatsAppBill)}
@@ -1107,3 +1420,5 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     </div>
   );
 }
+
+export default SalesReportsView;
