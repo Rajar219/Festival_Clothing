@@ -303,6 +303,51 @@ export async function changeStaffMemberRole(email, newRole, updatedBy = 'Admin')
 // FIREBASE AUTHENTICATION FLOWS
 // ----------------------------------------------------------------------------
 
+/**
+ * Synchronizes local bills with Firestore sales_bills collection
+ */
+export async function syncBillsWithFirestore(localBills) {
+  if (!firestoreDb) {
+    return { syncedCount: 0, remoteBills: [] };
+  }
+
+  // 1. Upload un-synced local bills
+  const unSynced = (localBills || []).filter((b) => b.syncStatus !== 'synced');
+  for (const b of unSynced) {
+    try {
+      const billKey = b.billNumber || b.id;
+      const docRef = doc(firestoreDb, 'sales_bills', billKey);
+      await setDoc(
+        docRef,
+        {
+          ...b,
+          syncStatus: 'synced',
+          syncedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Failed to upload bill to Firestore:', b.billNumber, e);
+    }
+  }
+
+  // 2. Fetch all bills from Firestore
+  const remoteBills = [];
+  try {
+    const snapshot = await getDocs(collection(firestoreDb, 'sales_bills'));
+    snapshot.forEach((docSnap) => {
+      remoteBills.push(docSnap.data());
+    });
+  } catch (err) {
+    console.warn('Failed to fetch bills from Firestore:', err);
+  }
+
+  return {
+    syncedCount: unSynced.length,
+    remoteBills,
+  };
+}
+
 export async function signInWithGoogle() {
   if (!firebaseAuth) {
     throw new Error('Firebase Authentication is not configured. Please add Firebase project keys in environment.');

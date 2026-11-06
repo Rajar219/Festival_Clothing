@@ -2,12 +2,13 @@
 // Local-First IndexedDB architecture with status reporting for central cloud synchronization
 import { getDB, getAllBills } from './db';
 import { getTerminalId, getTerminalType } from './terminal';
+import { isFirebaseConfigured, syncBillsWithFirestore } from './firebase';
 
 let isSyncInProgress = false;
 let currentSyncStatus = 'unconfigured'; // 'unconfigured' | 'synced' | 'syncing' | 'offline' | 'pending'
 let pendingCount = 0;
 let lastSyncTimestamp = null;
-let lastSyncMessage = 'Local-First Storage Active (Central Cloud Sync Not Configured)';
+let lastSyncMessage = 'Local-First Storage Active';
 
 const statusListeners = new Set();
 
@@ -36,7 +37,7 @@ export function getSyncState() {
     lastSyncTimestamp,
     message: lastSyncMessage,
     isOnline,
-    isCloudConfigured: false, // Cloud database (e.g. Firebase Firestore) is not configured
+    isCloudConfigured: isFirebaseConfigured(),
   };
 }
 
@@ -49,8 +50,17 @@ export async function refreshSyncQueueStatus() {
     const allBills = await db.getAll('bills');
     const localPending = allBills.filter((b) => b.syncStatus !== 'synced');
     pendingCount = localPending.length;
-    currentSyncStatus = 'unconfigured';
-    lastSyncMessage = `Operating Local-First (IndexedDB: ${allBills.length} total bills). Central Cloud DB is not configured.`;
+
+    if (!isFirebaseConfigured()) {
+      currentSyncStatus = 'unconfigured';
+      lastSyncMessage = `Operating Local-First (IndexedDB: ${allBills.length} bills). Central Cloud Database is not yet connected in Vercel.`;
+    } else if (pendingCount > 0) {
+      currentSyncStatus = 'pending';
+      lastSyncMessage = `${pendingCount} bill(s) pending sync to Central Cloud Database.`;
+    } else {
+      currentSyncStatus = 'synced';
+      lastSyncMessage = 'All bills synchronised with Central Cloud Database.';
+    }
     notifyListeners();
   } catch (err) {
     console.warn('Failed to inspect local bills queue:', err);
@@ -61,12 +71,72 @@ export async function refreshSyncQueueStatus() {
  * Manual sync trigger or retry
  */
 export async function syncWithBackend() {
-  await refreshSyncQueueStatus();
-  return {
-    success: false,
-    status: 'unconfigured',
-    message: 'Central Cloud Database (Firebase Firestore) is not configured. All bills are stored safely in your browser local IndexedDB.',
-  };
+  if (!isFirebaseConfigured()) {
+    await refreshSyncQueueStatus();
+    return {
+      success: false,
+      status: 'unconfigured',
+      message: 'Central database not yet connected in Vercel. Operating in local-first mode.',
+    };
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return {
+      success: false,
+      status: 'offline',
+      message: 'Device is offline. Pending bills will sync when reconnected.',
+    };
+  }
+
+  isSyncInProgress = true;
+  currentSyncStatus = 'syncing';
+  notifyListeners();
+
+  try {
+    const db = await getDB();
+    const localBills = await db.getAll('bills');
+    const { syncedCount, remoteBills } = await syncBillsWithFirestore(localBills);
+
+    // Merge remote bills from other devices into local IndexedDB
+    for (const rb of remoteBills) {
+      const exists = localBills.some((lb) => lb.billNumber === rb.billNumber || lb.id === rb.id);
+      if (!exists) {
+        await db.put('bills', { ...rb, syncStatus: 'synced' });
+      }
+    }
+
+    // Mark all local bills as synced
+    const tx = db.transaction('bills', 'readwrite');
+    for (const b of localBills) {
+      if (b.syncStatus !== 'synced') {
+        await tx.store.put({ ...b, syncStatus: 'synced' });
+      }
+    }
+    await tx.done;
+
+    pendingCount = 0;
+    currentSyncStatus = 'synced';
+    lastSyncTimestamp = new Date().toISOString();
+    lastSyncMessage = `Synchronised with Central Database! (${syncedCount} bills uploaded)`;
+    notifyListeners();
+
+    return {
+      success: true,
+      status: 'success',
+      message: `Cross-device sync complete! (${syncedCount} uploaded)`,
+    };
+  } catch (err) {
+    console.warn('Central sync error:', err);
+    currentSyncStatus = 'pending';
+    notifyListeners();
+    return {
+      success: false,
+      status: 'error',
+      message: 'Sync error: ' + err.message,
+    };
+  } finally {
+    isSyncInProgress = false;
+  }
 }
 
 export function startPeriodicSync() {
