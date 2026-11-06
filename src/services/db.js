@@ -750,6 +750,7 @@ export function exportLineItemsCSV(bills, shopName = 'FESTIVAL CLOTHING') {
   }
 
   const headers = [
+    's_no',
     'bill_id',
     'bill_number',
     'timestamp_iso',
@@ -770,6 +771,7 @@ export function exportLineItemsCSV(bills, shopName = 'FESTIVAL CLOTHING') {
   ];
 
   const rows = [];
+  let itemSNo = 1;
 
   for (const b of bills) {
     const items = b.items && b.items.length > 0 ? b.items : [
@@ -783,6 +785,7 @@ export function exportLineItemsCSV(bills, shopName = 'FESTIVAL CLOTHING') {
       const itemTotRed = Number(item.itemTotalReduction !== undefined ? item.itemTotalReduction : (redPerUnit * item.qty));
 
       rows.push([
+        itemSNo++,
         escapeCSV(b.id),
         escapeCSV(b.billNumber),
         escapeCSV(b.createdAt),
@@ -818,6 +821,7 @@ export function exportBillsSummaryCSV(bills, shopName = 'FESTIVAL CLOTHING') {
   }
 
   const headers = [
+    's_no',
     'bill_id',
     'bill_number',
     'timestamp_iso',
@@ -841,11 +845,12 @@ export function exportBillsSummaryCSV(bills, shopName = 'FESTIVAL CLOTHING') {
     'attribution',
   ];
 
-  const rows = bills.map((b) => {
+  const rows = bills.map((b, idx) => {
     const itemCount = b.items?.length || 0;
     const totalQty = (b.items || []).reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
 
     return [
+      idx + 1,
       escapeCSV(b.id),
       escapeCSV(b.billNumber),
       escapeCSV(b.createdAt),

@@ -5,6 +5,7 @@ import App from '../src/App';
 import { POSProvider } from '../src/context/POSContext';
 import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
 import { FESTIVE_QUOTES, getBillFestiveQuote } from '../src/services/db';
+import { SalesReportsView } from '../src/components/SalesReportsView';
 import fs from 'fs';
 import path from 'path';
 
@@ -318,5 +319,25 @@ describe('App Render & Responsive Design Test', () => {
     // 3. Verify bill with existing quote preserves it
     const sampleBill2 = { id: 'bill_xyz', festiveQuote: FESTIVE_QUOTES[3] };
     expect(getBillFestiveQuote(sampleBill2)).toBe(FESTIVE_QUOTES[3]);
+  });
+
+  it('verifies SalesReportsView renders S.No headers in Sales History and Reports & Analytics tables', () => {
+    // 1. History mode S.No
+    const historyHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="history" />
+      </POSProvider>
+    );
+    expect(historyHtml).toContain('S.No');
+    expect(historyHtml).toContain('Bill Number');
+
+    // 2. Reports mode S.No
+    const reportsHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="reports" />
+      </POSProvider>
+    );
+    expect(reportsHtml).toContain('S.No');
+    expect(reportsHtml).toContain('Reports &amp; Analytics');
   });
 });

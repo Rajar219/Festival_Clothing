@@ -254,9 +254,10 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       }
     }
 
-    const topProducts = Object.values(productSalesMap)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 8);
+    const allProductSales = Object.values(productSalesMap)
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const topProducts = allProductSales.slice(0, 8);
 
     return {
       totalSales,
@@ -279,6 +280,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       monthSales,
       monthCount,
       topProducts,
+      allProductSales,
     };
   }, [filteredBills, allBills, todayStart, yesterdayStart, monthStart]);
 
@@ -652,7 +654,9 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <div className="top-products-list">
                 {stats.topProducts.map((p, idx) => (
                   <div key={idx} className="top-product-row">
-                    <span className="top-p-rank">#{idx + 1}</span>
+                    <span className="top-p-rank">
+                      <span className="serial-number-badge">#{idx + 1}</span>
+                    </span>
                     <div className="top-p-info">
                       <strong className="top-p-name">{p.name}</strong>
                       <span className="top-p-qty">{p.qty} units sold</span>
@@ -660,6 +664,81 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                     <span className="top-p-rev">{formatINR(p.revenue, true)}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Item-Wise Sales Report Table with Serial Numbers */}
+          {stats.allProductSales && stats.allProductSales.length > 0 && (
+            <div className="ledger-card" style={{ marginTop: '20px' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Package size={20} style={{ color: '#064e3b' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#064e3b', fontWeight: 700 }}>
+                    Item-Wise Sales & Revenue Report
+                  </h3>
+                </div>
+                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                  {stats.allProductSales.length} items sold • Period: <strong>{dateFilter.toUpperCase()}</strong>
+                </span>
+              </div>
+
+              <div className="ledger-scroll-container">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th className="text-center" style={{ width: '60px' }}>S.No</th>
+                      <th>Product / Apparel Name</th>
+                      <th className="text-center">Units Sold</th>
+                      <th className="text-right">Total Revenue</th>
+                      <th className="text-right">% Share of Sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.allProductSales.map((p, idx) => {
+                      const share = stats.totalSales > 0 ? ((p.revenue / stats.totalSales) * 100).toFixed(1) : '0.0';
+                      return (
+                        <tr key={idx}>
+                          <td className="text-center">
+                            <span className="serial-number-badge">{idx + 1}</span>
+                          </td>
+                          <td>
+                            <strong style={{ color: '#0f172a' }}>{p.name}</strong>
+                          </td>
+                          <td className="text-center font-mono">
+                            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                              {p.qty} pcs
+                            </span>
+                          </td>
+                          <td className="text-right font-mono" style={{ fontWeight: 700, color: '#064e3b' }}>
+                            {formatINR(p.revenue, true)}
+                          </td>
+                          <td className="text-right font-mono" style={{ color: '#64748b' }}>
+                            {share}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
+                      <td colSpan={2} className="text-right" style={{ padding: '12px 16px' }}>
+                        Total Product Performance:
+                      </td>
+                      <td className="text-center" style={{ padding: '12px 16px' }}>
+                        <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '4px' }}>
+                          {stats.totalUnitsSold} pcs
+                        </span>
+                      </td>
+                      <td className="text-right font-mono" style={{ padding: '12px 16px', color: '#064e3b', fontSize: '1rem' }}>
+                        {formatINR(stats.totalSales, true)}
+                      </td>
+                      <td className="text-right" style={{ padding: '12px 16px' }}>
+                        100.0%
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           )}
@@ -819,6 +898,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           <table className="ledger-table">
             <thead>
               <tr>
+                <th className="text-center" style={{ width: '56px' }}>S.No</th>
                 <th>Bill Number</th>
                 <th>Date & Time</th>
                 <th>Terminal</th>
@@ -836,18 +916,21 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <tbody>
               {filteredBills.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center empty-ledger-cell">
+                  <td colSpan={13} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
                     <p>No bills found for the selected filter criteria.</p>
                   </td>
                 </tr>
               ) : (
-                filteredBills.map((bill) => {
+                filteredBills.map((bill, index) => {
                   const isCancelled = bill.status === 'cancelled';
                   const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
 
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
+                      <td className="text-center">
+                        <span className="serial-number-badge">{index + 1}</span>
+                      </td>
                       <td>
                         <strong className="bill-number-text">{bill.billNumber}</strong>
                       </td>
@@ -978,7 +1061,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <p>No bills found for the selected filter criteria.</p>
             </div>
           ) : (
-            filteredBills.map((bill) => {
+            filteredBills.map((bill, index) => {
               const isCancelled = bill.status === 'cancelled';
               const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
               const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
@@ -988,6 +1071,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   {/* Card Header */}
                   <div className="mobile-bill-header">
                     <div className="mobile-bill-number-row">
+                      <span className="mobile-bill-sno-badge" title="Serial Number">#{index + 1}</span>
                       <strong className="mobile-bill-num">{bill.billNumber}</strong>
                       <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
                         {isMobileTerminal ? <Smartphone size={11} /> : <Laptop size={11} />}
@@ -1153,7 +1237,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 <table className="details-items-table">
                   <thead>
                     <tr>
-                      <th>#</th>
+                      <th className="text-center" style={{ width: '50px' }}>S.No</th>
                       <th>Item</th>
                       <th className="text-center">Qty</th>
                       <th className="text-right">Orig Price</th>
