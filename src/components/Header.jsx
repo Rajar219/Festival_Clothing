@@ -38,6 +38,10 @@ export function Header() {
     terminalInfo,
     syncState,
     triggerManualSync,
+    currentStaffUser,
+    logoutStaff,
+    loginWithGoogleStaff,
+    isFirebaseConfigured,
   } = usePOS();
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -170,9 +174,24 @@ export function Header() {
             </button>
           </nav>
 
-          {/* Role Indicator / Switcher */}
+          {/* Role & Staff Account Indicator */}
           <div className="role-switcher-badge">
-            {isAdmin ? (
+            {currentStaffUser ? (
+              <div className="admin-status-pill staff-account-pill">
+                <Shield size={13} className="admin-icon" />
+                <span className="role-name" title={currentStaffUser.email}>
+                  {currentStaffUser.email.split('@')[0]} ({currentStaffUser.role})
+                </span>
+                <button
+                  type="button"
+                  className="role-switch-btn"
+                  onClick={logoutStaff}
+                  title="Sign out of staff account"
+                >
+                  (Exit)
+                </button>
+              </div>
+            ) : isAdmin ? (
               <div className="admin-status-pill">
                 <Shield size={13} className="admin-icon" />
                 <span className="role-name">Admin</span>

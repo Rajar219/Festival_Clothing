@@ -47,6 +47,9 @@ import {
   X,
   UserCheck,
   Sparkles,
+  Users,
+  UserPlus,
+  Trash2,
 } from 'lucide-react';
 
 export function SettingsView() {
@@ -66,6 +69,12 @@ export function SettingsView() {
     isDriveConnected,
     connectDrive,
     disconnectDrive,
+    staffList,
+    currentStaffUser,
+    approveStaff,
+    revokeStaff,
+    changeStaffRole,
+    isFirebaseConfigured,
   } = usePOS();
 
   // Active sub-tab inside Admin Settings: 'shop' | 'products' | 'combos' | 'discounts' | 'gdrive' | 'receipt' | 'admin'
@@ -105,6 +114,29 @@ export function SettingsView() {
   const [combosConfig, setCombosConfig] = useState(() => {
     return (settings && settings.combos) ? settings.combos : DEFAULT_COMBOS;
   });
+
+  // Staff Account Management State
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState('CASHIER');
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+
+  const handleAddStaffSubmit = async (e) => {
+    e.preventDefault();
+    if (!newStaffEmail || !newStaffEmail.includes('@')) {
+      showToast('Please enter a valid staff email address.', 'error');
+      return;
+    }
+    setIsAddingStaff(true);
+    try {
+      await approveStaff(newStaffEmail.trim().toLowerCase(), newStaffRole);
+      setNewStaffEmail('');
+      showToast(`Approved ${newStaffEmail.trim()} as ${newStaffRole}!`, 'success');
+    } catch (err) {
+      showToast(`Failed to approve staff: ${err.message}`, 'error');
+    } finally {
+      setIsAddingStaff(false);
+    }
+  };
   const [isSavingCombos, setIsSavingCombos] = useState(false);
 
   useEffect(() => {
@@ -463,6 +495,14 @@ export function SettingsView() {
         >
           <Printer size={16} />
           <span>Receipt & Printer</span>
+        </button>
+        <button
+          type="button"
+          className={`settings-nav-pill ${activeTab === 'staff' ? 'active' : ''}`}
+          onClick={() => setActiveTab('staff')}
+        >
+          <Users size={16} />
+          <span>Staff Accounts</span>
         </button>
         <button
           type="button"
@@ -1143,6 +1183,203 @@ export function SettingsView() {
               <p style={{ margin: '0 0 6px', lineHeight: 1.4 }}>
                 All transaction records are saved locally inside this browser's IndexedDB. To protect against accidental browser cache clearing or device loss, connect Google Drive or download a JSON backup at daily closing.
               </p>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {/* SECTION 7: STAFF EMAIL ACCESS CONTROL */}
+      {activeTab === 'staff' && (
+        <ErrorBoundary title="Staff Accounts Section">
+          <div className="settings-section-card">
+            <div className="card-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={22} className="card-icon" />
+                <h3 className="card-title">Authorized Staff Email Accounts (Admin Controlled)</h3>
+              </div>
+              <div>
+                {isFirebaseConfigured ? (
+                  <span className="badge-sync-ready" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', padding: '4px 10px' }}>
+                    <ShieldCheck size={14} /> Firebase Auth & Firestore Active
+                  </span>
+                ) : (
+                  <span className="badge-sync-offline" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', padding: '4px 10px', background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1' }}>
+                    <Info size={14} /> Local Offline Mode (PIN + Storage Cache)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '18px', lineHeight: 1.5 }}>
+              Manage authorized Google accounts for cashiers and administrators. Cashiers can ring up bills and share WhatsApp invoices, while only Admins can alter prices, combos, and store settings.
+            </p>
+
+            {/* Add New Staff Email Form */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '24px' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '0.95rem', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <UserPlus size={16} /> Authorize New Staff Member
+              </h4>
+              <form onSubmit={handleAddStaffSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+                <div style={{ flex: '2 1 240px' }}>
+                  <label className="input-group-label" style={{ marginBottom: '4px' }}>Staff Google Email Address *</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    placeholder="e.g. staff.cashier@gmail.com"
+                    value={newStaffEmail}
+                    onChange={(e) => setNewStaffEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={{ flex: '1 1 140px' }}>
+                  <label className="input-group-label" style={{ marginBottom: '4px' }}>Assigned Role</label>
+                  <select
+                    className="form-control"
+                    value={newStaffRole}
+                    onChange={(e) => setNewStaffRole(e.target.value)}
+                  >
+                    <option value="CASHIER">CASHIER (Billing Desk)</option>
+                    <option value="ADMIN">ADMIN (Full Access)</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={isAddingStaff}
+                  style={{ height: '42px', padding: '0 18px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <UserCheck size={16} />
+                  <span>{isAddingStaff ? 'Approving...' : 'Approve Staff'}</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Approved Staff Members List */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 12px', fontSize: '0.95rem', color: '#1e293b' }}>
+                Currently Approved Accounts ({staffList?.length || 0})
+              </h4>
+
+              {(!staffList || staffList.length === 0) ? (
+                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>No staff members registered yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {staffList.map((staff) => {
+                    const isRevoked = staff.status === 'revoked';
+                    const isOwner = staff.approvedBy === 'SYSTEM_OWNER' || staff.email === 'leviraja670@gmail.com';
+
+                    return (
+                      <div
+                        key={staff.email}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '12px',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          border: isRevoked ? '1px dashed #cbd5e1' : '1px solid #e2e8f0',
+                          background: isRevoked ? '#f8fafc' : '#ffffff',
+                          opacity: isRevoked ? 0.75 : 1,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: staff.role === 'ADMIN' ? '#dcfce7' : '#e0f2fe',
+                              color: staff.role === 'ADMIN' ? '#166534' : '#0369a1',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            {staff.email ? staff.email[0].toUpperCase() : 'U'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>
+                              {staff.email}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#64748b' }}>
+                              <span>Approved {staff.approvedAt ? new Date(staff.approvedAt).toLocaleDateString('en-IN') : 'Default'}</span>
+                              {isOwner && <span style={{ color: '#059669', fontWeight: 600 }}>• Primary Owner</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              background: staff.role === 'ADMIN' ? '#dcfce7' : '#e0f2fe',
+                              color: staff.role === 'ADMIN' ? '#166534' : '#0369a1',
+                            }}
+                          >
+                            {staff.role}
+                          </span>
+
+                          {isRevoked ? (
+                            <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600, background: '#fee2e2', padding: '3px 8px', borderRadius: '4px' }}>
+                              REVOKED
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, background: '#dcfce7', padding: '3px 8px', borderRadius: '4px' }}>
+                              ACTIVE
+                            </span>
+                          )}
+
+                          {!isOwner && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                                onClick={() => changeStaffRole(staff.email, staff.role === 'ADMIN' ? 'CASHIER' : 'ADMIN')}
+                                title="Toggle between Cashier and Admin role"
+                              >
+                                Change to {staff.role === 'ADMIN' ? 'CASHIER' : 'ADMIN'}
+                              </button>
+
+                              {isRevoked ? (
+                                <button
+                                  type="button"
+                                  className="btn-primary"
+                                  style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#059669' }}
+                                  onClick={() => approveStaff(staff.email, staff.role)}
+                                >
+                                  Re-Activate
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ fontSize: '0.75rem', padding: '4px 8px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                  onClick={() => revokeStaff(staff.email)}
+                                >
+                                  Revoke
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Offline Fallback Notice */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
+              <strong>Admin PIN Fallback:</strong> If operating offline or without Google sign-in, the Administrator PINs <code>2111</code> and <code>1234</code> remain fully available to unlock store administration anytime on any device.
             </div>
           </div>
         </ErrorBoundary>

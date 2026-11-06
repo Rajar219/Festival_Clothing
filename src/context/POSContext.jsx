@@ -44,6 +44,18 @@ import {
   subscribeSyncStatus,
   getSyncState,
 } from '../services/syncService';
+import {
+  isFirebaseConfigured,
+  getApprovedStaffList,
+  approveStaffMember,
+  revokeStaffMember,
+  changeStaffMemberRole,
+  verifyStaffAccess,
+  signInWithGoogle,
+  signOutStaff,
+  subscribeAuthState,
+  getLocalStaffCache,
+} from '../services/firebase';
 
 export const POSContext = createContext(null);
 
@@ -104,6 +116,120 @@ export function POSProvider({ children }) {
 
   // Terminal Device Identity (Main PC Cash Counter vs Mobile Floor Terminal)
   const [terminalInfo, setTerminalInfo] = useState(() => getTerminalInfo());
+
+  // Staff Approval System (Firebase Auth & Firestore + Local Cache)
+  const [staffList, setStaffList] = useState(() => getLocalStaffCache());
+  const [currentStaffUser, setCurrentStaffUser] = useState(null);
+
+  const refreshStaffList = useCallback(async () => {
+    try {
+      const list = await getApprovedStaffList();
+      setStaffList(list);
+    } catch (e) {
+      console.warn('Refresh staff error:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStaffList();
+  }, [refreshStaffList]);
+
+  // Firebase auth state subscription
+  useEffect(() => {
+    const unsub = subscribeAuthState(async (user) => {
+      if (user && user.email) {
+        const check = await verifyStaffAccess(user.email);
+        if (check.isAllowed) {
+          setCurrentStaffUser({
+            email: user.email,
+            role: check.role,
+            name: user.displayName || user.email,
+          });
+          setUserRole(check.role.toLowerCase());
+          setCurrentUserName(user.displayName || user.email);
+        } else {
+          await signOutStaff();
+          setCurrentStaffUser(null);
+          showToast(check.reason, 'error');
+        }
+      } else {
+        setCurrentStaffUser(null);
+      }
+    });
+    return unsub;
+  }, [showToast]);
+
+  const approveStaff = useCallback(async (email, role) => {
+    try {
+      const approvedBy = currentStaffUser?.email || currentUserName || 'Admin';
+      await approveStaffMember(email, role, approvedBy);
+      await refreshStaffList();
+      showToast(`Staff ${email} approved as ${role.toUpperCase()}.`, 'success');
+      return true;
+    } catch (err) {
+      showToast('Error approving staff: ' + err.message, 'error');
+      return false;
+    }
+  }, [currentStaffUser, currentUserName, refreshStaffList, showToast]);
+
+  const revokeStaff = useCallback(async (email) => {
+    try {
+      const revokedBy = currentStaffUser?.email || currentUserName || 'Admin';
+      await revokeStaffMember(email, revokedBy);
+      await refreshStaffList();
+      showToast(`Staff access revoked for ${email}.`, 'info');
+      return true;
+    } catch (err) {
+      showToast('Error revoking staff: ' + err.message, 'error');
+      return false;
+    }
+  }, [currentStaffUser, currentUserName, refreshStaffList, showToast]);
+
+  const changeStaffRole = useCallback(async (email, newRole) => {
+    try {
+      const updatedBy = currentStaffUser?.email || currentUserName || 'Admin';
+      await changeStaffMemberRole(email, newRole, updatedBy);
+      await refreshStaffList();
+      showToast(`Role for ${email} updated to ${newRole.toUpperCase()}.`, 'success');
+      return true;
+    } catch (err) {
+      showToast('Error updating staff role: ' + err.message, 'error');
+      return false;
+    }
+  }, [currentStaffUser, currentUserName, refreshStaffList, showToast]);
+
+  const loginWithGoogleStaff = useCallback(async () => {
+    try {
+      const user = await signInWithGoogle();
+      if (!user?.email) throw new Error('No email found in Google Account.');
+      const check = await verifyStaffAccess(user.email);
+      if (!check.isAllowed) {
+        await signOutStaff();
+        showToast(check.reason, 'error');
+        return false;
+      }
+      setCurrentStaffUser({
+        email: user.email,
+        role: check.role,
+        name: user.displayName || user.email,
+      });
+      setUserRole(check.role.toLowerCase());
+      setCurrentUserName(user.displayName || user.email);
+      showToast(`Welcome! Authorized as ${check.role}`, 'success');
+      return true;
+    } catch (err) {
+      showToast('Staff Google sign-in: ' + err.message, 'error');
+      return false;
+    }
+  }, [showToast]);
+
+  const logoutStaff = useCallback(async () => {
+    await signOutStaff();
+    setCurrentStaffUser(null);
+    setUserRole('cashier');
+    setCurrentUserName('Cashier 1');
+    showToast('Signed out of staff account.', 'info');
+  }, [showToast]);
 
   const changeTerminalType = useCallback((type) => {
     saveTerminalType(type);
@@ -848,8 +974,8 @@ export function POSProvider({ children }) {
 
   // Role switching with pending navigation target resolution
   const loginAsAdmin = useCallback((pin) => {
-    // Default PIN: 1234
-    if (pin === '1234' || pin === 'admin') {
+    // Accepted PINs: 1234 or 2111 or admin
+    if (pin === '1234' || pin === '2111' || pin === 'admin') {
       setUserRole('admin');
       setCurrentUserName('Admin');
       setIsAdminAuthModalOpen(false);
@@ -1106,6 +1232,15 @@ export function POSProvider({ children }) {
     toast,
     showToast,
     isStorageAvailable: isStorageAvailable(),
+    staffList,
+    currentStaffUser,
+    refreshStaffList,
+    approveStaff,
+    revokeStaff,
+    changeStaffRole,
+    loginWithGoogleStaff,
+    logoutStaff,
+    isFirebaseConfigured: isFirebaseConfigured(),
   };
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

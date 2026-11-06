@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the caller's email is an approved ADMIN
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/approved_staff/$(request.auth.token.email.lower())) &&
+        get(/databases/$(database)/documents/approved_staff/$(request.auth.token.email.lower())).data.role == 'ADMIN' &&
+        get(/databases/$(database)/documents/approved_staff/$(request.auth.token.email.lower())).data.status == 'active';
+    }
+
+    // Helper function to check if caller is an approved active staff member (Admin or Cashier)
+    function isApprovedStaff() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/approved_staff/$(request.auth.token.email.lower())) &&
+        get(/databases/$(database)/documents/approved_staff/$(request.auth.token.email.lower())).data.status == 'active';
+    }
+
+    // Staff authorization collection
+    // Only Admins can approve, modify, or revoke staff accounts
+    // Approved staff can read their own profile
+    match /approved_staff/{email} {
+      allow read: if isApprovedStaff() || (isAuthenticated() && request.auth.token.email.lower() == email);
+      allow write: if isAdmin();
+    }
+
+    // Live Sales Bills Collection
+    // Cashiers and Admins can create and read bills
+    // Only Admins can delete or void records
+    match /sales_bills/{billId} {
+      allow read, create: if isApprovedStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

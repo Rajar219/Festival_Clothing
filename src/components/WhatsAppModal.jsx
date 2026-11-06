@@ -1,60 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePOS } from '../context/POSContext';
 import { useModalBehavior } from '../hooks/useModalBehavior';
 import {
   validateIndianMobile,
-  generateWhatsAppReceiptText,
-  generateWhatsAppLink,
+  generateWhatsAppDirectChatText,
   generateReceiptPDF,
 } from '../utils/receiptGenerator';
+import { formatINR } from '../utils/currency';
 import {
   Phone,
   Send,
   X,
-  FileText,
   Download,
   AlertCircle,
   CheckCircle2,
   Share2,
-  RotateCcw,
-  Info,
+  FileText,
   ExternalLink,
 } from 'lucide-react';
 
 export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
-  const { settings, startNewBill, showToast, updateBillRecordStatus } = usePOS();
+  const { settings, showToast, updateBillRecordStatus } = usePOS();
 
-  const [mobileNumber, setMobileNumber] = useState(bill?.customerPhone || '');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [pdfDownloaded, setPdfDownloaded] = useState(false);
-  const [canShareFile, setCanShareFile] = useState(false);
-  const [stepNotice, setStepNotice] = useState('');
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
-  const [isIncomplete, setIsIncomplete] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+  const [sharingStatus, setSharingStatus] = useState('idle'); // 'idle' | 'chat_opened' | 'shared_native'
+  const [pdfReady, setPdfReady] = useState(false);
+
+  // Cached generated PDF references to prevent repeated generation
+  const cachedPdfRef = useRef(null);
 
   useEffect(() => {
     if (bill?.customerPhone) {
       setMobileNumber(bill.customerPhone);
+    } else {
+      setMobileNumber('');
     }
-    // Check if device is mobile
-    const checkMobile = typeof navigator !== 'undefined' && (
-      /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
-      (settings.deviceType === 'MOBILE')
-    );
-    setIsMobileDevice(checkMobile);
+    setErrorMsg('');
+    setSharingStatus('idle');
 
-    // Check if browser supports native file sharing
+    // Pre-generate PDF once for this bill
+    if (bill) {
+      try {
+        const result = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
+        cachedPdfRef.current = result;
+        setPdfReady(true);
+      } catch (err) {
+        console.warn('PDF pre-generation warning:', err);
+      }
+    }
+
+    // Check if device supports native file sharing
     try {
       if (typeof navigator !== 'undefined' && navigator.canShare) {
         const testFile = new File(['test'], 'test.pdf', { type: 'application/pdf' });
-        setCanShareFile(navigator.canShare({ files: [testFile] }));
+        setCanNativeShare(Boolean(navigator.canShare({ files: [testFile] })));
       } else {
-        setCanShareFile(false);
+        setCanNativeShare(false);
       }
     } catch {
-      setCanShareFile(false);
+      setCanNativeShare(false);
     }
-  }, [bill, settings.deviceType]);
+  }, [bill]);
 
   const { handleBackdropClick } = useModalBehavior({
     isOpen,
@@ -63,7 +71,8 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
 
   if (!isOpen || !bill) return null;
 
-  const handleSendWhatsAppInvoice = async () => {
+  // 1. PRIMARY METHOD: Direct Customer WhatsApp Chat (wa.me click-to-chat)
+  const handleOpenDirectCustomerChat = async () => {
     const validation = validateIndianMobile(mobileNumber);
     if (!validation.isValid) {
       setErrorMsg(validation.error);
@@ -71,280 +80,243 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
 
     setErrorMsg('');
-    setStepNotice('');
 
-    const receiptText = generateWhatsAppReceiptText(bill, settings);
-
-    // 1. Generate Thermal A4 PDF blob for customer sharing
-    let pdfBlob = null;
-    let pdfFileName = `${bill.billNumber}_Invoice.pdf`;
-    try {
-      const pdfResult = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
-      pdfBlob = pdfResult.blob;
-      pdfFileName = pdfResult.fileName;
-    } catch (err) {
-      console.warn('PDF generation fallback:', err);
-    }
-
-    // 2. Mobile Workflow: Native Web Share API with file attachment
-    if (pdfBlob && canShareFile && typeof navigator !== 'undefined' && navigator.share) {
+    // Ensure PDF is ready & downloaded for immediate attachment
+    let pdfResult = cachedPdfRef.current;
+    if (!pdfResult) {
       try {
-        const pdfFile = new File([pdfBlob], pdfFileName, { type: 'application/pdf' });
-        if (navigator.canShare({ files: [pdfFile] })) {
-          await navigator.share({
-            title: `${settings.shopName || 'Festival Clothing'} Invoice #${bill.billNumber}`,
-            text: receiptText,
-            files: [pdfFile],
-          });
-          if (updateBillRecordStatus) {
-            await updateBillRecordStatus(bill.id, { whatsappStatus: 'sharing_opened', pdfStatus: 'generated' });
-          }
-          setStepNotice('Device share sheet opened! Select WhatsApp to complete sending.');
-          showToast('Share dialog opened. Complete sending in WhatsApp.', 'info');
-          return;
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          // Cashier cancelled / dismissed share sheet
-          setIsIncomplete(true);
-          if (onSharingIncomplete) onSharingIncomplete();
-          if (updateBillRecordStatus) {
-            await updateBillRecordStatus(bill.id, { whatsappStatus: 'not_completed' });
-          }
-          setStepNotice('Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.');
-          showToast('WhatsApp sharing was not completed. Bill is safely saved.', 'info');
-          return;
-        }
-        console.warn('Native file share fallback:', err);
+        pdfResult = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
+        cachedPdfRef.current = pdfResult;
+      } catch (e) {
+        console.warn('PDF generation error:', e);
       }
-    }
-
-    // 3. PC Workflow & Fallback: Download PDF & Open WhatsApp Web
-    try {
-      if (pdfBlob) {
-        const url = URL.createObjectURL(pdfBlob);
+    } else {
+      // Trigger download so cashier has the PDF ready in Downloads / Files to attach
+      try {
+        const url = URL.createObjectURL(pdfResult.blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = pdfFileName;
+        a.download = pdfResult.fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        setPdfDownloaded(true);
+      } catch (e) {
+        console.warn('PDF trigger download:', e);
+      }
+    }
+
+    // Exact message specified in prompt
+    const message = generateWhatsAppDirectChatText(bill);
+    const waUrl = `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(message)}`;
+
+    // Open direct WhatsApp chat to customer's exact phone number
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+    if (updateBillRecordStatus) {
+      await updateBillRecordStatus(bill.id, {
+        whatsappStatus: 'chat_opened',
+        customerPhone: validation.cleanNumber,
+      });
+    }
+
+    setSharingStatus('chat_opened');
+    showToast(`WhatsApp chat opened for +91 ${validation.cleanNumber}. Attach PDF and press Send.`, 'success');
+  };
+
+  // 2. SECONDARY METHOD: Native Device File Sharing
+  const handleNativeFileShare = async () => {
+    const validation = validateIndianMobile(mobileNumber);
+    const cleanNum = validation.isValid ? validation.cleanNumber : '';
+    const message = generateWhatsAppDirectChatText(bill);
+
+    let pdfResult = cachedPdfRef.current;
+    if (!pdfResult) {
+      pdfResult = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
+      cachedPdfRef.current = pdfResult;
+    }
+
+    if (pdfResult?.blob && navigator.share) {
+      try {
+        const pdfFile = new File([pdfResult.blob], pdfResult.fileName, { type: 'application/pdf' });
+        await navigator.share({
+          title: `FESTIVAL CLOTHING Invoice #${bill.billNumber}`,
+          text: message,
+          files: [pdfFile],
+        });
+
+        if (updateBillRecordStatus) {
+          await updateBillRecordStatus(bill.id, {
+            whatsappStatus: 'sharing_opened',
+            customerPhone: cleanNum || bill.customerPhone,
+          });
+        }
+        setSharingStatus('shared_native');
+        showToast('Device share sheet opened. Select recipient to complete sending.', 'info');
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          if (onSharingIncomplete) onSharingIncomplete();
+          showToast('Sharing cancelled. Bill remains safely saved.', 'info');
+        } else {
+          showToast('Share failed: ' + err.message, 'error');
+        }
+      }
+    } else {
+      // Fallback: download PDF directly
+      handleDownloadPDF();
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    try {
+      if (cachedPdfRef.current?.blob) {
+        const url = URL.createObjectURL(cachedPdfRef.current.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = cachedPdfRef.current.fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       } else {
         generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
-        setPdfDownloaded(true);
       }
+      showToast(`Invoice PDF downloaded for #${bill.billNumber}`, 'success');
     } catch (err) {
-      console.warn('Auto download error:', err);
+      showToast('Download error: ' + err.message, 'error');
     }
-
-    // Open WhatsApp Web on PC, or WhatsApp link on mobile
-    try {
-      const waUrl = isMobileDevice
-        ? `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(receiptText)}`
-        : `https://web.whatsapp.com/send?phone=91${validation.cleanNumber}&text=${encodeURIComponent(receiptText)}`;
-
-      window.open(waUrl, '_blank', 'noopener,noreferrer');
-
-      if (updateBillRecordStatus) {
-        await updateBillRecordStatus(bill.id, { whatsappStatus: 'sharing_opened', pdfStatus: 'generated' });
-      }
-
-      setStepNotice(
-        `WhatsApp opened for ${validation.formattedNumber}! The PDF invoice (${pdfFileName}) is downloaded on your computer. Click the 📎 paperclip icon in WhatsApp Web, choose Document, and select the downloaded PDF.`
-      );
-      showToast('WhatsApp opened and PDF downloaded. Complete send in WhatsApp.', 'info');
-    } catch (openErr) {
-      setIsIncomplete(true);
-      if (onSharingIncomplete) onSharingIncomplete();
-      if (updateBillRecordStatus) {
-        await updateBillRecordStatus(bill.id, { whatsappStatus: 'failed' });
-      }
-      setStepNotice('Bill saved successfully. WhatsApp sharing was not completed. You can share the invoice later from Sales History.');
-      showToast('WhatsApp window could not be opened. You can download the PDF or retry later from Sales History.', 'warning');
-    }
-  };
-
-  const handleDownloadOnlyPDF = () => {
-    try {
-      generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
-      setPdfDownloaded(true);
-      showToast('Thermal PDF invoice downloaded successfully.', 'success');
-    } catch (err) {
-      showToast('Failed to generate PDF: ' + err.message, 'error');
-    }
-  };
-
-  const handleDoneAndNewBill = () => {
-    onClose();
-    startNewBill();
   };
 
   return (
     <div className="modal-overlay" onClick={handleBackdropClick} role="dialog" aria-modal="true">
-      <div className="modal-dialog whatsapp-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title-wrap">
-            <h2 className="modal-title">Share Invoice via WhatsApp</h2>
-            <span className="modal-subtitle">
-              {isMobileDevice ? 'Mobile WhatsApp Direct Share' : 'WhatsApp Web Desktop Sharing'}
-            </span>
+      <div className="modal-dialog compact-whatsapp-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Compact Modal Header */}
+        <div className="whatsapp-modal-header">
+          <div className="whatsapp-title-group">
+            <h2 className="whatsapp-modal-title">Share Invoice</h2>
+            <div className="whatsapp-bill-meta">
+              <span className="wa-bill-pill">#{bill.billNumber}</span>
+              <span className="wa-total-pill">{formatINR(bill.finalPayableAmount, true)}</span>
+            </div>
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="whatsapp-close-btn"
             onClick={onClose}
-            aria-label="Close dialog"
+            aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="modal-body">
-          {/* Bill summary chip */}
-          <div className="whatsapp-bill-meta-banner">
-            <div>
-              <span className="meta-label">Bill Number:</span>
-              <strong className="meta-value">{bill.billNumber}</strong>
-            </div>
-            <div>
-              <span className="meta-label">Grand Total:</span>
-              <strong className="meta-val-highlight">₹{(bill.finalPayableAmount || 0).toFixed(2)}</strong>
-            </div>
-          </div>
-
-          {/* Customer WhatsApp mobile input */}
-          <div className="form-group">
-            <label className="input-group-label" htmlFor="wa-mobile-input">
-              Customer Indian Mobile Number *
+        {/* Compact Modal Body */}
+        <div className="whatsapp-modal-body">
+          {/* Customer Number Input */}
+          <div className="wa-input-section">
+            <label htmlFor="wa-customer-phone" className="wa-input-label">
+              Customer WhatsApp Mobile Number *
             </label>
-            <div className="whatsapp-phone-input-wrap">
-              <span className="country-prefix">+91</span>
+            <div className={`wa-phone-input-wrap ${errorMsg ? 'has-error' : ''}`}>
+              <span className="wa-country-badge">+91</span>
               <input
-                id="wa-mobile-input"
+                id="wa-customer-phone"
                 type="tel"
                 inputMode="numeric"
-                className="whatsapp-phone-input"
-                placeholder="10-digit mobile number"
+                pattern="[0-9]*"
+                maxLength={10}
+                placeholder="Enter 10-digit mobile number"
+                className="wa-phone-input"
                 value={mobileNumber}
                 onChange={(e) => {
-                  setMobileNumber(e.target.value);
-                  setErrorMsg('');
-                  setStepNotice('');
+                  setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10));
+                  if (errorMsg) setErrorMsg('');
                 }}
-                maxLength={15}
                 autoFocus
               />
+              {mobileNumber.length === 10 && (
+                <CheckCircle2 size={16} className="wa-valid-icon" />
+              )}
             </div>
-            {errorMsg ? (
-              <span className="phone-validation-error">
-                <AlertCircle size={14} /> {errorMsg}
+            {errorMsg && (
+              <span className="wa-error-text">
+                <AlertCircle size={12} />
+                {errorMsg}
               </span>
-            ) : (
-              <small className="phone-hint-text">
-                Enter customer's 10-digit Indian WhatsApp mobile number (no registration required).
-              </small>
             )}
           </div>
 
-          {/* Prominent Action Button: SEND WHATSAPP INVOICE */}
-          <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-            <button
-              type="button"
-              id="btn-send-whatsapp-invoice"
-              className="btn-whatsapp-send prominent-send-btn"
-              onClick={handleSendWhatsAppInvoice}
-              style={{
-                width: '100%',
-                padding: '14px 20px',
-                fontSize: '1rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                borderRadius: '10px',
-                background: '#059669',
-                color: '#ffffff',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-              }}
-            >
-              <Send size={18} />
-              <span>SEND WHATSAPP INVOICE</span>
-            </button>
+          {/* Accurate Status & Guidance Notice */}
+          <div className="wa-info-notice">
+            <div className="wa-status-row">
+              <span className="wa-status-badge saved">
+                <CheckCircle2 size={11} />
+                Bill Saved Locally
+              </span>
+              <span className={`wa-status-badge ${pdfReady ? 'ready' : ''}`}>
+                <FileText size={11} />
+                {pdfReady ? 'PDF Ready' : 'Generating PDF'}
+              </span>
+            </div>
+            <p className="wa-guide-text">
+              {sharingStatus === 'chat_opened'
+                ? 'Direct WhatsApp chat opened! The PDF has been downloaded to your device for immediate attachment.'
+                : 'Your invoice is saved. Tapping Open Chat opens WhatsApp directly to this customer.'}
+            </p>
           </div>
 
-          {/* Step Guidance or Failure Recovery Notice */}
-          {stepNotice ? (
-            <div
-              className="whatsapp-status-notice"
-              style={{
-                background: isIncomplete ? '#fffbeb' : '#f0fdf4',
-                border: `1px solid ${isIncomplete ? '#fde68a' : '#a7f3d0'}`,
-                padding: '12px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-              }}
+          {/* Action Buttons */}
+          <div className="wa-actions-group">
+            {/* Primary Action: Direct Customer Chat */}
+            <button
+              type="button"
+              id="btn-open-wa-chat"
+              className="wa-btn-primary"
+              onClick={handleOpenDirectCustomerChat}
             >
-              <Info
-                size={18}
-                className="notice-icon"
-                style={{ color: isIncomplete ? '#d97706' : '#059669', flexShrink: 0, marginTop: '2px' }}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '0.85rem',
-                  color: isIncomplete ? '#92400e' : '#064e3b',
-                  lineHeight: 1.4,
-                  fontWeight: isIncomplete ? 600 : 400,
-                }}
-              >
-                {stepNotice}
-              </p>
-            </div>
-          ) : (
-            <div className="whatsapp-pdf-option-box">
-              <div className="pdf-option-info">
-                <FileText size={18} className="pdf-icon" />
-                <div>
-                  <strong>A4 Retail Invoice PDF</strong>
-                  <p>Includes itemized retail reductions and full order breakdown.</p>
-                </div>
-              </div>
+              <Send size={16} />
+              <span>OPEN CUSTOMER WHATSAPP CHAT</span>
+            </button>
+
+            {/* Secondary Action: Native Share / Download PDF */}
+            <div className="wa-secondary-row">
+              {canNativeShare && (
+                <button
+                  type="button"
+                  id="btn-native-share"
+                  className="wa-btn-secondary"
+                  onClick={handleNativeFileShare}
+                  title="Share file and text using device share sheet"
+                >
+                  <Share2 size={14} />
+                  <span>Share PDF</span>
+                </button>
+              )}
               <button
                 type="button"
-                className="btn-download-pdf-sm"
-                onClick={handleDownloadOnlyPDF}
+                className="wa-btn-secondary"
+                onClick={handleDownloadPDF}
+                title="Download invoice PDF to your device"
               >
                 <Download size={14} />
-                <span>{pdfDownloaded ? 'Downloaded' : 'Download PDF'}</span>
+                <span>Download PDF</span>
               </button>
             </div>
-          )}
-
-          <div style={{ marginTop: '10px', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
-            <em>Note: The cashier completes the final send in WhatsApp. FESTIVAL CLOTHING does not claim delivery until sent.</em>
           </div>
         </div>
 
-        <div className="modal-footer whatsapp-footer">
+        {/* Compact Modal Footer */}
+        <div className="whatsapp-modal-footer">
           <button
             type="button"
-            className="btn-primary start-next-btn"
-            onClick={handleDoneAndNewBill}
-            style={{ width: '100%' }}
+            className="wa-btn-done"
+            onClick={onClose}
           >
-            <RotateCcw size={16} />
-            <span>Done / Next Bill (Enter)</span>
+            Done / Close
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+export default WhatsAppModal;

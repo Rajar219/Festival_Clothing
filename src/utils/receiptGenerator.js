@@ -40,22 +40,26 @@ export function validateIndianMobile(raw) {
   };
 }
 
+export function generateWhatsAppDirectChatText(bill) {
+  const billNumber = bill?.billNumber || '';
+  return `Thanks for purchasing from FESTIVAL CLOTHING!\n\nWe appreciate your support. Visit us again!\n\nInvoice No: ${billNumber}`;
+}
+
 /**
  * Generates formatted WhatsApp itemized receipt text from actual finalized transaction
  * Follows exact two-line greeting specification:
  * Line 1: Thanks for purchasing from FESTIVAL CLOTHING!
  * Line 2: We appreciate your support. Visit us again!
+ * Line 3: Invoice No: [BILL NUMBER]
  */
 export function generateWhatsAppReceiptText(bill, settings = {}) {
-  const shopName = bill.storeDetails?.name || settings.shopName || 'FESTIVAL CLOTHING';
-  const paymentUpper = (bill.paymentMethod || 'cash').toUpperCase();
-  const grandTotal = (bill.finalPayableAmount || 0).toFixed(2);
+  const shopName = bill?.storeDetails?.name || settings?.shopName || 'FESTIVAL CLOTHING';
+  const grandTotal = (bill?.finalPayableAmount || 0).toFixed(2);
+  const paymentUpper = (bill?.paymentMethod || 'cash').toUpperCase();
 
-  // Exact clean two-line customer greeting (Zero 3rd party branding)
   let text = `Thanks for purchasing from ${shopName.toUpperCase()}!\n\n`;
   text += `We appreciate your support. Visit us again!\n\n`;
-  text += `*Invoice No:* ${bill.billNumber}\n`;
-  text += `*Date:* ${formatDateTime(bill.createdAt)}\n`;
+  text += `*Invoice No:* ${bill?.billNumber || ''}\n`;
   text += `*Amount Paid:* ₹${grandTotal}\n`;
   text += `*Payment:* ${paymentUpper}\n\n`;
   text += `Please find your retail invoice attached.`;

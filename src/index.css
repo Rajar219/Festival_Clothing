@@ -3047,8 +3047,15 @@ kbd {
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ==========================================================================
@@ -4006,13 +4013,25 @@ kbd {
 }
 
 @keyframes fadeInModal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleUpModal {
-  from { transform: scale(0.96); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* ==========================================================================
@@ -4129,7 +4148,8 @@ kbd {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1 1 auto;
-  min-height: 0; /* Prevents overflow escaping flex container */
+  min-height: 0;
+  /* Prevents overflow escaping flex container */
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -4522,8 +4542,13 @@ kbd {
   }
 
   @keyframes slideUpBottomSheet {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
   }
 
   .price-selector-header {
@@ -4604,6 +4629,7 @@ kbd {
     opacity: 0;
     transform: translateY(20px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -4858,8 +4884,15 @@ kbd {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .detail-box-label {
@@ -5169,8 +5202,13 @@ kbd {
   }
 
   @keyframes sheetSlideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
   }
 
   .checkout-modal-header {

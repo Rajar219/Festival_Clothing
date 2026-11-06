@@ -56,7 +56,7 @@ export function MobileBottomNav() {
         <div className="mobile-nav-icon-wrap">
           <History size={21} />
         </div>
-        <span className="mobile-nav-label">Sales History</span>
+        <span className="mobile-nav-label">Sales</span>
       </button>
 
       {/* 3. REPORTS */}
@@ -85,7 +85,7 @@ export function MobileBottomNav() {
           <Settings size={21} />
           {!isAdmin && <Lock size={10} className="mobile-nav-lock" />}
         </div>
-        <span className="mobile-nav-label">Admin Settings</span>
+        <span className="mobile-nav-label">Settings</span>
       </button>
     </nav>
   );
