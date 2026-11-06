@@ -42,6 +42,7 @@ import {
   Tag,
   User,
   Phone,
+  Clock,
 } from 'lucide-react';
 
 export function SalesReportsView({ defaultTab = 'history' }) {
@@ -457,25 +458,44 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           <Database size={18} className="banner-icon" />
         )}
         <div className="banner-text">
-          {isFirebaseConfigured ? (
-            <>
-              <strong>Shared Cloud Database Active:</strong> PC and Mobile terminals synchronise sales in real-time via Cloud Firestore (collection: <code>sales_bills</code>). Local IndexedDB serves as the offline-first cache so billing never stops.
+          <div className="banner-desktop-text desktop-only">
+            {isFirebaseConfigured ? (
+              <>
+                <strong>Shared Cloud Database Active:</strong> PC and Mobile terminals synchronise sales in real-time via Cloud Firestore (collection: <code>sales_bills</code>). Local IndexedDB serves as the offline-first cache so billing never stops.
+                {(syncState?.pendingCount || 0) > 0 && (
+                  <span style={{ display: 'block', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
+                    ⏳ {syncState.pendingCount} bill(s) pending sync to cloud database.
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <strong>Local-First Storage Active:</strong> Bills are securely saved in this device's browser database (IndexedDB). Central cloud database is operating in local fallback mode.
+              </>
+            )}
+          </div>
+          <div className="banner-mobile-card mobile-only">
+            <div className="banner-mobile-header">
+              <strong className="banner-mobile-title">
+                {isFirebaseConfigured ? 'Cloud Sync Active' : 'Local-First Storage Active'}
+              </strong>
               {(syncState?.pendingCount || 0) > 0 && (
-                <span style={{ display: 'block', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
-                  ⏳ {syncState.pendingCount} bill(s) pending sync to cloud database.
+                <span className="banner-mobile-pending-pill">
+                  {syncState.pendingCount} Pending
                 </span>
               )}
-            </>
-          ) : (
-            <>
-              <strong>Local-First Storage Active:</strong> Bills are securely saved in this device's browser database (IndexedDB). Central cloud database is operating in local fallback mode.
-            </>
-          )}
+            </div>
+            <p className="banner-mobile-desc">
+              {isFirebaseConfigured
+                ? 'PC and Mobile bills synchronised.'
+                : 'Bills securely saved in browser database.'}
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="banner-actions-group">
           <button
             type="button"
-            className="btn-backup-banner-action"
+            className="btn-backup-banner-action btn-sync-action"
             onClick={triggerManualSync}
             title="Sync all sales now with central database"
             disabled={syncState?.status === 'syncing'}
@@ -485,7 +505,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           </button>
           <button
             type="button"
-            className="btn-backup-banner-action"
+            className="btn-backup-banner-action btn-backup-action"
             onClick={handleExportFullBackup}
             title="Download complete database backup JSON"
           >
@@ -1255,11 +1275,13 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
               return (
                 <div key={bill.id} className={`mobile-bill-card ${isCancelled ? 'card-cancelled' : ''}`}>
-                  {/* Card Header */}
-                  <div className="mobile-bill-header">
-                    <div className="mobile-bill-number-row">
-                      <span className="mobile-bill-sno-badge" title="Serial Number">#{index + 1}</span>
+                  {/* ROW 1: Top row: Bill number | PC/Mobile | Payment status */}
+                  <div className="mobile-bill-top-row">
+                    <div className="mobile-bill-id-box">
+                      <span className="mobile-bill-sno-badge">#{index + 1}</span>
                       <strong className="mobile-bill-num">{bill.billNumber}</strong>
+                    </div>
+                    <div className="mobile-bill-status-box">
                       <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
                         {isMobileTerminal ? <Smartphone size={11} /> : <Laptop size={11} />}
                         <span>{isMobileTerminal ? 'Mobile' : 'PC'}</span>
@@ -1270,105 +1292,116 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         <span className="badge-status paid">PAID</span>
                       )}
                     </div>
-                    <span className="mobile-bill-time">{formatDateTime(bill.createdAt)}</span>
                   </div>
 
-                  {/* Customer Info (if available) */}
-                  {(bill.customerName || bill.customerPhone) && (
-                    <div className="mobile-bill-customer-row">
-                      <User size={12} className="cust-icon" />
-                      <span>{bill.customerName || 'Customer'}</span>
-                      {bill.customerPhone && (
-                        <span className="mobile-bill-phone">({bill.customerPhone})</span>
-                      )}
-                    </div>
-                  )}
+                  {/* ROW 2: Second row: Date and time */}
+                  <div className="mobile-bill-second-row">
+                    <Clock size={12} className="meta-icon" />
+                    <span className="bill-datetime">{formatDateTime(bill.createdAt)}</span>
+                    {bill.cashierName && (
+                      <span className="bill-cashier-tag">• {bill.cashierName}</span>
+                    )}
+                  </div>
 
-                  {/* Items Summary */}
-                  <div className="mobile-bill-items-row">
-                    <span className="mobile-bill-items-text">
+                  {/* ROW 3: Third row: Product summary */}
+                  <div className="mobile-bill-third-row">
+                    {(bill.customerName || bill.customerPhone) && (
+                      <div className="bill-customer-subline">
+                        <User size={11} />
+                        <span>{bill.customerName || 'Customer'}</span>
+                        {bill.customerPhone && <span className="bill-customer-phone">({bill.customerPhone})</span>}
+                      </div>
+                    )}
+                    <div className="bill-products-summary">
                       {(bill.items || []).map((i) => `${i.name} (×${i.qty})`).join(', ')}
-                    </span>
+                    </div>
                   </div>
 
-                  {/* Financial Amounts & Payment Tag */}
-                  <div className="mobile-bill-financials-row">
-                    <div className="mobile-bill-amounts">
-                      {totalSavings > 0 && (
-                        <span className="mobile-bill-sub-reduction">
-                          Orig: ₹{bill.subtotal || bill.finalPayableAmount} • Saved: -₹{totalSavings}
-                        </span>
-                      )}
-                      <span className={`mobile-bill-final ${isCancelled ? 'struck' : ''}`}>
+                  {/* ROW 4: Fourth row: Original amount / Savings */}
+                  <div className="mobile-bill-fourth-row">
+                    {totalSavings > 0 ? (
+                      <div className="bill-savings-bar">
+                        <span className="bill-orig-text">Orig: ₹{bill.subtotal || bill.finalPayableAmount}</span>
+                        <span className="bill-savings-tag">Saved -₹{totalSavings}</span>
+                      </div>
+                    ) : (
+                      <span className="bill-regular-price">Retail Price (Standard)</span>
+                    )}
+                  </div>
+
+                  {/* ROW 5: Fifth row: Final payable amount */}
+                  <div className="mobile-bill-fifth-row">
+                    <div className="bill-final-payable-box">
+                      <span className="payable-label">Final Payable:</span>
+                      <span className={`bill-final-value ${isCancelled ? 'struck' : ''}`}>
                         {formatINR(bill.finalPayableAmount, true)}
                       </span>
                     </div>
-
-                    <div className="mobile-bill-tags">
-                      <span className={`badge-payment-sm ${bill.paymentMethod || 'cash'}`}>
-                        {(bill.paymentMethod || 'cash').toUpperCase()}
-                      </span>
-                      <span className="mobile-cashier-pill">{bill.cashierName || 'Cashier'}</span>
-                    </div>
+                    <span className={`badge-payment-sm ${bill.paymentMethod || 'cash'}`}>
+                      {(bill.paymentMethod || 'cash').toUpperCase()}
+                    </span>
                   </div>
 
-                  {/* Action Buttons: View, WhatsApp, PDF, Print, Void, Delete */}
-                  <div className="mobile-bill-actions-row">
+                  {/* Actions: Details | WhatsApp | PDF | Print */}
+                  <div className="mobile-bill-primary-actions">
                     <button
                       type="button"
-                      className="mobile-bill-action-btn view"
+                      className="mobile-action-btn view"
                       onClick={() => setSelectedBill(bill)}
                       title="View bill details"
                     >
-                      <Eye size={15} />
+                      <Eye size={14} />
                       <span>Details</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-bill-action-btn whatsapp"
+                      className="mobile-action-btn whatsapp"
                       onClick={() => setWhatsAppBill(bill)}
                       title="Share on WhatsApp"
-                      style={{ color: '#059669' }}
                     >
-                      <Send size={15} />
+                      <Send size={14} />
                       <span>WhatsApp</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-bill-action-btn download"
+                      className="mobile-action-btn download"
                       onClick={() => handleDownloadBillPDF(bill)}
                       title="Download PDF"
                     >
-                      <Download size={15} />
+                      <Download size={14} />
                       <span>PDF</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-bill-action-btn print"
+                      className="mobile-action-btn print"
                       onClick={() => triggerPrint(bill, 'thermal')}
                       title="Reprint receipt"
                     >
-                      <Printer size={15} />
+                      <Printer size={14} />
                       <span>Print</span>
                     </button>
+                  </div>
+
+                  {/* Secondary action area: Void and Delete with confirmation */}
+                  <div className="mobile-bill-secondary-actions">
                     {!isCancelled && (
                       <button
                         type="button"
-                        className="mobile-bill-action-btn cancel"
+                        className="mobile-secondary-btn void"
                         onClick={() => handleAttemptCancel(bill)}
-                        title="Cancel / void bill"
+                        title="Void this bill"
                       >
-                        <Ban size={15} />
-                        <span>Void</span>
+                        <Ban size={12} />
+                        <span>Void Bill</span>
                       </button>
                     )}
                     <button
                       type="button"
-                      className="mobile-bill-action-btn delete"
+                      className="mobile-secondary-btn delete"
                       onClick={() => handleAttemptDelete(bill)}
                       title="Delete bill permanently"
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={12} />
                       <span>Delete</span>
                     </button>
                   </div>
