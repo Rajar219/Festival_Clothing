@@ -7068,3 +7068,27 @@ kbd {
 .mobile-download-pdf-chip:hover {
   background: #059669;
 }
+
+.secondary-pdf-btn {
+  background: #ffffff !important;
+  color: #064e3b !important;
+  border: 1.5px solid #059669 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+.secondary-pdf-btn:hover {
+  background: #f0fdf4 !important;
+  border-color: #047857 !important;
+  color: #044332 !important;
+  box-shadow: 0 3px 8px rgba(5, 150, 105, 0.2) !important;
+}
+
+.secondary-export-pdf {
+  background: #ffffff !important;
+  color: #064e3b !important;
+  border: 1.5px solid #059669 !important;
+}
+
+.secondary-export-pdf:hover {
+  background: #f0fdf4 !important;
+}

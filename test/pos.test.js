@@ -21,6 +21,11 @@ import {
   generateReceiptPDF,
 } from '../src/utils/receiptGenerator';
 import {
+  generateSalesSummaryPDF,
+  groupBillsByDate,
+  getReportPeriodLabel,
+} from '../src/utils/salesSummaryPdfGenerator';
+import {
   evaluateCombos,
   calculateBillTotals,
   DEFAULT_COMBOS,
@@ -1507,5 +1512,136 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(finalizedUpiBill.amountReceived).toBe(1850);
     expect(finalizedUpiBill.changeDue).toBe(0);
     expect(finalizedUpiBill.upiRef).toBe('428901238912');
+  });
+
+  // Test 30: Thermal Sales Summary & Transactions PDF Generation
+  it('Requirement 30: Generates Thermal Sales Summary PDF with full itemized transactions history', () => {
+    const sampleBills = [
+      {
+        billNumber: 'FC-20261107-0003',
+        createdAt: '2026-11-07T11:43:00.000Z',
+        terminalType: 'PC',
+        paymentMethod: 'upi',
+        status: 'completed',
+        subtotal: 600,
+        totalReduction: 100,
+        comboSavings: 0,
+        finalPayableAmount: 500,
+        items: [{ name: 'Shirts', qty: 1, unitPrice: 600, finalUnitPrice: 500, lineTotal: 500 }],
+      },
+      {
+        billNumber: 'FC-20261107-0002',
+        createdAt: '2026-11-07T11:39:00.000Z',
+        terminalType: 'PC',
+        paymentMethod: 'cash',
+        status: 'completed',
+        subtotal: 1250,
+        totalReduction: 250,
+        comboSavings: 0,
+        finalPayableAmount: 1000,
+        items: [
+          { name: 'Shirts', qty: 1, unitPrice: 550, finalUnitPrice: 500, lineTotal: 500 },
+          { name: 'Formal Pants', qty: 1, unitPrice: 700, finalUnitPrice: 500, lineTotal: 500 },
+        ],
+      },
+      {
+        billNumber: 'FC-20261107-0001',
+        createdAt: '2026-11-07T09:19:00.000Z',
+        terminalType: 'MOBILE',
+        paymentMethod: 'upi',
+        status: 'completed',
+        subtotal: 600,
+        totalReduction: 50,
+        comboSavings: 0,
+        finalPayableAmount: 550,
+        items: [{ name: 'Shirts', qty: 1, unitPrice: 600, finalUnitPrice: 550, lineTotal: 550 }],
+      },
+    ];
+
+    const { doc, fileName, blob, totalPages } = generateSalesSummaryPDF({
+      bills: sampleBills,
+      dateFilter: 'today',
+      autoDownload: false,
+    });
+
+    expect(doc).toBeDefined();
+    expect(fileName).toContain('FC_Sales_Summary_TODAY');
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(0);
+    expect(totalPages).toBeGreaterThanOrEqual(1);
+
+    const pdfText = doc.internal.pages.flat().join(' ');
+
+    // Store branding & thermal title
+    expect(pdfText).toContain('FESTIVAL CLOTHING');
+    expect(pdfText).toContain('MENSWEAR');
+    expect(pdfText).toContain('DAILY SALES SUMMARY & TRANSACTIONS REPORT');
+    expect(pdfText).toContain('No. 10/12, N.N Garden, Old Washermenpet, Chennai - 21');
+
+    // Section 1: Executive Summary
+    expect(pdfText).toContain('1. OVERALL SALES SUMMARY');
+    expect(pdfText).toContain('Total Completed Bills : 3');
+    expect(pdfText).toContain('TOTAL NET SALES');
+    expect(pdfText).toContain('Rs. 2050.00');
+    expect(pdfText).toContain('Cash Collections : Rs. 1000.00');
+    expect(pdfText).toContain('UPI Collections  : Rs. 1050.00');
+    expect(pdfText).toContain('Parity Verified');
+
+    // Section 2: Day-wise breakdown
+    expect(pdfText).toContain('2. DAY-WISE SALES BREAKDOWN');
+
+    // Section 3: Itemized Sales History Transactions ("all sales history in the pdf")
+    expect(pdfText).toContain('3. ITEMISED SALES HISTORY TRANSACTIONS');
+    expect(pdfText).toContain('FC-20261107-0003');
+    expect(pdfText).toContain('FC-20261107-0002');
+    expect(pdfText).toContain('FC-20261107-0001');
+    expect(pdfText).toContain('Shirts');
+    expect(pdfText).toContain('Formal Pants');
+
+    // Thermal footer
+    expect(pdfText).toContain('*** END OF SALES SUMMARY & TRANSACTIONS REPORT ***');
+    expect(pdfText).not.toContain('GSTIN');
+    expect(pdfText).not.toContain('CGST');
+    expect(pdfText).not.toContain('WISDO TECH');
+  });
+
+  // Test 31: Group bills by date parity verification
+  it('Requirement 31: groupBillsByDate correctly aggregates revenue and excludes cancelled bills', () => {
+    const bills = [
+      {
+        billNumber: 'FC-1',
+        createdAt: '2026-11-07T10:00:00.000Z',
+        paymentMethod: 'cash',
+        status: 'completed',
+        finalPayableAmount: 1000,
+        terminalType: 'PC',
+      },
+      {
+        billNumber: 'FC-2',
+        createdAt: '2026-11-07T12:00:00.000Z',
+        paymentMethod: 'upi',
+        status: 'completed',
+        finalPayableAmount: 500,
+        terminalType: 'MOBILE',
+      },
+      {
+        billNumber: 'FC-3',
+        createdAt: '2026-11-07T14:00:00.000Z',
+        paymentMethod: 'cash',
+        status: 'cancelled',
+        finalPayableAmount: 800,
+        terminalType: 'PC',
+      },
+    ];
+
+    const groups = groupBillsByDate(bills);
+    expect(groups.length).toBe(1);
+    expect(groups[0].totalBills).toBe(3);
+    expect(groups[0].completedBills).toBe(2);
+    expect(groups[0].cancelledBills).toBe(1);
+    expect(groups[0].cashSales).toBe(1000);
+    expect(groups[0].upiSales).toBe(500);
+    expect(groups[0].totalSales).toBe(1500);
+    expect(groups[0].cashSales + groups[0].upiSales).toBe(groups[0].totalSales);
   });
 });

@@ -105,10 +105,12 @@ export function getReportPeriodLabel(dateFilter, bills = []) {
   }
   if (filterKey === 'all') {
     if (bills && bills.length > 0) {
-      const dates = bills.map((b) => new Date(b.createdAt).getTime());
-      const minD = new Date(Math.min(...dates));
-      const maxD = new Date(Math.max(...dates));
-      return `All Time (${minD.toLocaleDateString('en-IN', options)} – ${maxD.toLocaleDateString('en-IN', options)})`;
+      const dates = bills.map((b) => new Date(b.createdAt).getTime()).filter(Boolean);
+      if (dates.length > 0) {
+        const minD = new Date(Math.min(...dates));
+        const maxD = new Date(Math.max(...dates));
+        return `All Time (${minD.toLocaleDateString('en-IN', options)} – ${maxD.toLocaleDateString('en-IN', options)})`;
+      }
     }
     return 'All Time Records';
   }
@@ -116,17 +118,31 @@ export function getReportPeriodLabel(dateFilter, bills = []) {
 }
 
 /**
- * Generates and downloads a professional A4 Daily Sales Summary PDF
+ * Summarizes product item names and quantities for transaction rows
+ */
+function formatItemsSummary(items = []) {
+  if (!items || items.length === 0) return 'No items recorded';
+  return items.map((it) => {
+    const qty = it.qty || 1;
+    const name = it.name || 'Item';
+    return `${name} (x${qty})`;
+  }).join(', ');
+}
+
+/**
+ * Generates and downloads a complete Thermal Monospace Sales Summary & Transactions PDF
  * 
- * Features:
+ * Aesthetic & Specification:
  * - A4 Portrait (210mm x 297mm)
- * - Deep emerald and white branding matching Festival Clothing luxury menswear
- * - Executive 6-Core KPI Summary Grid
- * - Day-wise Sales Breakdown Table (Date, Total Bills, Cash, UPI, Total Sales)
- * - Daily Detailed Audit (Completed, Cancelled, Terminal Split, Customer Savings)
+ * - Monospace typography (Courier bold / normal) matching Thermal Receipt style
+ * - Pure black & white thermal aesthetic with dashed dividers (---)
+ * - Centered Store Header & Address
+ * - Section 1: Executive Overall Sales Summary (Completed, Gross, Reductions, Combo Savings, Cash, UPI, Parity, PC/Mobile split)
+ * - Section 2: Day-wise Sales Breakdown Table (Date, Bills, Cash, UPI, Total Sales)
+ * - Section 3: COMPLETE ITEMISED SALES HISTORY TRANSACTIONS LEDGER (Every bill itemized with #, Bill No, Time, Terminal, Payment, Status, Amount, Items & Savings)
+ * - Robust multi-page pagination with running thermal headers
  * - Two-pass page numbering ("Page X of Y")
- * - Zero GST fields, zero WISDO TECH attribution on customer-facing/business PDF
- * - Parity verified: Cash + UPI = Total Sales
+ * - Zero GST fields, zero third-party attribution
  */
 export function generateSalesSummaryPDF({
   bills = [],
@@ -146,11 +162,14 @@ export function generateSalesSummaryPDF({
   const marginLeft = 15;
   const marginRight = 195;
   const contentWidth = marginRight - marginLeft; // 180mm
+  const pageCenter = 105;
 
   const store = {
     name: settings?.shopName || 'FESTIVAL CLOTHING',
     subtitle: 'MENSWEAR',
-    address: 'No. 10/12, N.N Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
+    address: settings?.address && !settings.address.includes('Main Bazaar')
+      ? settings.address
+      : 'No. 10/12, N.N Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
     phone: settings?.phone || '',
   };
 
@@ -158,7 +177,7 @@ export function generateSalesSummaryPDF({
   const generatedAtStr = formatDateTime(new Date().toISOString());
   const dayGroups = groupBillsByDate(bills);
 
-  // Fallback stats computation if not provided
+  // Compute metrics from bills array
   const validBills = (bills || []).filter((b) => b.status !== 'cancelled');
   const cancelledBills = (bills || []).filter((b) => b.status === 'cancelled');
 
@@ -166,13 +185,19 @@ export function generateSalesSummaryPDF({
     ? stats.totalSales
     : validBills.reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
 
+  const cashBills = validBills.filter((b) => b.paymentMethod === 'cash');
+  const upiBills = validBills.filter((b) => b.paymentMethod === 'upi');
+
   const cashTotal = stats.cashTotal !== undefined
     ? stats.cashTotal
-    : validBills.filter((b) => b.paymentMethod === 'cash').reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
+    : cashBills.reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
 
   const upiTotal = stats.upiTotal !== undefined
     ? stats.upiTotal
-    : validBills.filter((b) => b.paymentMethod === 'upi').reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
+    : upiBills.reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
+
+  const cashCount = cashBills.length;
+  const upiCount = upiBills.length;
 
   const totalDiscounts = stats.totalDiscounts !== undefined
     ? stats.totalDiscounts
@@ -185,354 +210,414 @@ export function generateSalesSummaryPDF({
   const totalSavings = totalDiscounts + totalComboSavings;
   const grossValue = totalSales + totalSavings;
 
+  const totalUnitsSold = validBills.reduce((acc, b) => {
+    return acc + (b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
+  }, 0);
+
+  const pcBills = validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() !== 'MOBILE');
+  const mobileBills = validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() === 'MOBILE');
+
   const pcSales = stats.pcSales !== undefined
     ? stats.pcSales
-    : validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() !== 'MOBILE').reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
+    : pcBills.reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
 
-  const pcCount = stats.pcCount !== undefined
-    ? stats.pcCount
-    : validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() !== 'MOBILE').length;
+  const pcCount = stats.pcCount !== undefined ? stats.pcCount : pcBills.length;
 
   const mobileSales = stats.mobileSales !== undefined
     ? stats.mobileSales
-    : validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() === 'MOBILE').reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
+    : mobileBills.reduce((acc, b) => acc + (Number(b.finalPayableAmount) || 0), 0);
 
-  const mobileCount = stats.mobileCount !== undefined
-    ? stats.mobileCount
-    : validBills.filter((b) => (b.terminalType || 'PC').toUpperCase() === 'MOBILE').length;
+  const mobileCount = stats.mobileCount !== undefined ? stats.mobileCount : mobileBills.length;
 
   const completedCount = validBills.length;
   const cancelledCount = cancelledBills.length;
 
-  let y = 14;
+  const cashPct = totalSales > 0 ? ((cashTotal / totalSales) * 100).toFixed(1) : '0.0';
+  const upiPct = totalSales > 0 ? ((upiTotal / totalSales) * 100).toFixed(1) : '0.0';
 
-  // Header renderer for page 1 and subsequent pages
-  const renderHeader = (isFirstPage = false) => {
-    // Top Emerald Accent Stripe
-    doc.setFillColor(6, 78, 59); // Deep Emerald #064e3b
-    doc.rect(0, 0, pageWidth, 5, 'F');
+  let y = 16;
+
+  // Helper to draw clean thermal dashed line
+  const drawDashedLine = (posY) => {
+    doc.setLineDashPattern([2, 1.5], 0);
+    doc.setLineWidth(0.35);
+    doc.setDrawColor(0, 0, 0);
+    doc.line(marginLeft, posY, marginRight, posY);
+  };
+
+  // Helper to draw solid line
+  const drawSolidLine = (posY, width = 0.35) => {
+    doc.setLineDashPattern([], 0);
+    doc.setLineWidth(width);
+    doc.setDrawColor(0, 0, 0);
+    doc.line(marginLeft, posY, marginRight, posY);
+  };
+
+  // Thermal Header Renderer
+  const renderThermalHeader = (isFirstPage = false) => {
+    doc.setTextColor(0, 0, 0);
 
     if (isFirstPage) {
-      y = 14;
-      // Store Title
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
-      doc.setTextColor(6, 78, 59);
-      doc.text(store.name, marginLeft, y);
+      y = 16;
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(16);
+      doc.text(store.name, pageCenter, y, { align: 'center' });
+      y += 5.5;
 
-      // Subtitle
-      doc.setFontSize(10);
-      doc.setTextColor(5, 150, 105); // Emerald Green #059669
-      doc.text(store.subtitle, marginLeft, y + 5.5);
-
-      // Address
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(71, 85, 105);
-      doc.text(store.address, marginLeft, y + 10.5);
-
-      // Right Header - Report Title & Meta
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(6, 78, 59);
-      doc.text('DAILY SALES REPORT', marginRight, y, { align: 'right' });
+      doc.setFontSize(11);
+      doc.setFont('courier', 'bold');
+      doc.text(store.subtitle, pageCenter, y, { align: 'center' });
+      y += 5;
 
       doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.text(`Period: ${periodLabel}`, marginRight, y + 5.5, { align: 'right' });
+      doc.setFont('courier', 'normal');
+      doc.text(store.address, pageCenter, y, { align: 'center', maxWidth: 170 });
+      y += 7.5;
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Generated: ${generatedAtStr}`, marginRight, y + 10.5, { align: 'right' });
-
-      y += 16;
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.4);
-      doc.line(marginLeft, y, marginRight, y);
-      y += 6;
-    } else {
-      y = 12;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(6, 78, 59);
-      doc.text(`${store.name} — DAILY SALES REPORT`, marginLeft, y);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Period: ${periodLabel}`, marginRight, y, { align: 'right' });
-
-      y += 4;
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.3);
-      doc.line(marginLeft, y, marginRight, y);
-      y += 6;
-    }
-  };
-
-  // Check page overflow
-  const ensureSpace = (neededHeight) => {
-    if (y + neededHeight > pageHeight - 18) {
-      doc.addPage();
-      renderHeader(false);
-    }
-  };
-
-  // Page 1 Header
-  renderHeader(true);
-
-  // =========================================================================
-  // SECTION A: OVERALL SALES SUMMARY (EXECUTIVE KPI GRID)
-  // =========================================================================
-  ensureSpace(42);
-
-  // Section Heading
-  doc.setFillColor(236, 253, 245); // #ecfdf5
-  doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(6, 78, 59);
-  doc.text('1. OVERALL SALES SUMMARY', marginLeft + 3, y + 4.6);
-  y += 9;
-
-  // 4-Column KPI Cards Grid
-  const cardW = (contentWidth - 9) / 4; // ~42.75mm
-  const cardH = 14;
-
-  const kpis = [
-    { label: 'TOTAL SALES (NET)', val: `Rs. ${totalSales.toLocaleString('en-IN')}`, sub: `${completedCount} completed bill(s)` },
-    { label: 'CASH COLLECTIONS', val: `Rs. ${cashTotal.toLocaleString('en-IN')}`, sub: `${((cashTotal / (totalSales || 1)) * 100).toFixed(1)}% of sales` },
-    { label: 'UPI COLLECTIONS', val: `Rs. ${upiTotal.toLocaleString('en-IN')}`, sub: `${((upiTotal / (totalSales || 1)) * 100).toFixed(1)}% of sales` },
-    { label: 'CUSTOMER SAVINGS', val: `Rs. ${totalSavings.toLocaleString('en-IN')}`, sub: `Disc: Rs. ${totalDiscounts.toLocaleString('en-IN')} | Combo: Rs. ${totalComboSavings.toLocaleString('en-IN')}` },
-    { label: 'PC COUNTER SALES', val: `Rs. ${pcSales.toLocaleString('en-IN')}`, sub: `${pcCount} bill(s)` },
-    { label: 'MOBILE TERMINAL', val: `Rs. ${mobileSales.toLocaleString('en-IN')}`, sub: `${mobileCount} bill(s)` },
-    { label: 'VOIDED / CANCELLED', val: `${cancelledCount} bill(s)`, sub: 'Excluded from totals' },
-    { label: 'GROSS MERCHANDISE', val: `Rs. ${grossValue.toLocaleString('en-IN')}`, sub: 'Original value before savings' },
-  ];
-
-  for (let i = 0; i < kpis.length; i++) {
-    const col = i % 4;
-    const row = Math.floor(i / 4);
-    const cx = marginLeft + col * (cardW + 3);
-    const cy = y + row * (cardH + 2.5);
-
-    doc.setFillColor(248, 250, 252); // #f8fafc
-    doc.setDrawColor(226, 232, 240); // #e2e8f0
-    doc.roundedRect(cx, cy, cardW, cardH, 1.5, 1.5, 'FD');
-
-    // KPI Label
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(kpis[i].label, cx + 3, cy + 4);
-
-    // KPI Value
-    doc.setFontSize(9.5);
-    doc.setTextColor(6, 78, 59);
-    doc.text(kpis[i].val, cx + 3, cy + 8.5);
-
-    // KPI Subtext
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(kpis[i].sub, cx + 3, cy + 12);
-  }
-
-  y += (cardH * 2) + 7;
-
-  // =========================================================================
-  // SECTION B: DAY-WISE SALES BREAKDOWN TABLE
-  // =========================================================================
-  ensureSpace(35);
-
-  doc.setFillColor(236, 253, 245);
-  doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(6, 78, 59);
-  doc.text('2. DAY-WISE SALES BREAKDOWN', marginLeft + 3, y + 4.6);
-  y += 8.5;
-
-  // Table Column Positions
-  const colDate = marginLeft + 3;
-  const colBills = marginLeft + 70;
-  const colCash = marginLeft + 115;
-  const colUpi = marginLeft + 150;
-  const colTotal = marginRight - 3;
-
-  // Table Header Row
-  doc.setFillColor(6, 78, 59);
-  doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(255, 255, 255);
-  doc.text('Date', colDate, y + 4.5);
-  doc.text('Total Bills', colBills, y + 4.5, { align: 'center' });
-  doc.text('Cash (Rs.)', colCash, y + 4.5, { align: 'right' });
-  doc.text('UPI (Rs.)', colUpi, y + 4.5, { align: 'right' });
-  doc.text('Total Sales (Rs.)', colTotal, y + 4.5, { align: 'right' });
-  y += 6.5;
-
-  // Table Body Rows
-  if (dayGroups.length === 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('No sales recorded for the selected period.', marginLeft + 3, y + 5);
-    y += 8;
-  } else {
-    dayGroups.forEach((dayGrp, idx) => {
-      ensureSpace(6);
-
-      // Alternating row background
-      if (idx % 2 === 1) {
-        doc.setFillColor(248, 250, 252);
-        doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+      if (store.phone) {
+        doc.text(`Phone: ${store.phone}`, pageCenter, y, { align: 'center' });
+        y += 4.5;
       }
 
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(11);
+      doc.text('DAILY SALES SUMMARY & TRANSACTIONS REPORT', pageCenter, y, { align: 'center' });
+      y += 5;
+
+      drawDashedLine(y);
+      y += 5;
+
+      // Meta Info Row
+      doc.setFontSize(8.5);
+      doc.setFont('courier', 'normal');
+      doc.text(`Report Period : ${periodLabel}`, marginLeft, y);
+      doc.text(`Generated At  : ${generatedAtStr}`, marginRight, y, { align: 'right' });
+      y += 4.5;
+      doc.text(`Terminal Scope: ALL TERMINALS (PC + MOBILE)`, marginLeft, y);
+      doc.text(`Currency      : INR (Rs.)`, marginRight, y, { align: 'right' });
+      y += 5;
+
+      drawDashedLine(y);
+      y += 6;
+    } else {
+      y = 14;
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(9.5);
+      doc.text(`${store.name} — SALES SUMMARY & TRANSACTIONS REPORT`, marginLeft, y);
+      doc.setFont('courier', 'normal');
       doc.setFontSize(8);
-      doc.setTextColor(15, 23, 42);
+      doc.text(`Period: ${periodLabel}`, marginRight, y, { align: 'right' });
+      y += 4;
+      drawDashedLine(y);
+      y += 6;
+    }
+  };
 
-      doc.text(dayGrp.displayDate, colDate, y + 3.8);
-      
-      const billDetailStr = dayGrp.cancelledBills > 0
-        ? `${dayGrp.completedBills} (${dayGrp.cancelledBills} void)`
-        : `${dayGrp.completedBills}`;
-      doc.text(billDetailStr, colBills, y + 3.8, { align: 'center' });
+  // Pagination space safeguard
+  const ensureSpace = (neededHeight) => {
+    if (y + neededHeight > pageHeight - 16) {
+      doc.addPage();
+      renderThermalHeader(false);
+    }
+  };
 
-      doc.text(dayGrp.cashSales.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colCash, y + 3.8, { align: 'right' });
-      doc.text(dayGrp.upiSales.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colUpi, y + 3.8, { align: 'right' });
+  // Render Page 1 Header
+  renderThermalHeader(true);
 
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(6, 78, 59);
-      doc.text(dayGrp.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colTotal, y + 3.8, { align: 'right' });
+  // =========================================================================
+  // SECTION 1: OVERALL EXECUTIVE SALES SUMMARY (THERMAL MONOSPACE)
+  // =========================================================================
+  ensureSpace(68);
 
-      // Subtle row border
-      doc.setDrawColor(241, 245, 249);
-      doc.setLineWidth(0.2);
-      doc.line(marginLeft, y + 5.5, marginRight, y + 5.5);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(10.5);
+  doc.text('1. OVERALL SALES SUMMARY', marginLeft, y);
+  y += 4.5;
+  drawDashedLine(y);
+  y += 5.5;
 
-      y += 5.5;
-    });
+  doc.setFontSize(9);
+  doc.setFont('courier', 'normal');
 
-    // Summary Total Row
-    ensureSpace(7);
-    doc.setFillColor(236, 253, 245); // #ecfdf5
-    doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(6, 78, 59);
+  doc.text(`Total Completed Bills : ${completedCount}`, marginLeft, y);
+  doc.text(`Gross Merchandise Value : Rs. ${grossValue.toFixed(2)}`, marginRight, y, { align: 'right' });
+  y += 4.5;
 
-    doc.text('TOTAL', colDate, y + 4.5);
-    doc.text(`${completedCount} Bills`, colBills, y + 4.5, { align: 'center' });
-    doc.text(cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colCash, y + 4.5, { align: 'right' });
-    doc.text(upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colUpi, y + 4.5, { align: 'right' });
-    doc.text(totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 }), colTotal, y + 4.5, { align: 'right' });
+  doc.text(`Cancelled Bills (Void): ${cancelledCount}`, marginLeft, y);
+  doc.text(`Total Item Reductions   : -Rs. ${totalDiscounts.toFixed(2)}`, marginRight, y, { align: 'right' });
+  y += 4.5;
 
-    doc.setDrawColor(5, 150, 105);
-    doc.setLineWidth(0.4);
-    doc.line(marginLeft, y, marginRight, y);
-    doc.line(marginLeft, y + 6.5, marginRight, y + 6.5);
+  doc.text(`Total Units Sold      : ${totalUnitsSold} Pcs`, marginLeft, y);
+  doc.text(`Total Combo Savings     : -Rs. ${totalComboSavings.toFixed(2)}`, marginRight, y, { align: 'right' });
+  y += 5.5;
 
-    y += 9.5;
+  drawDashedLine(y);
+  y += 5.5;
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(10.5);
+  doc.text(`TOTAL NET SALES       : Rs. ${totalSales.toFixed(2)}`, marginLeft, y);
+  doc.text(`TOTAL CUSTOMER SAVINGS  : Rs. ${totalSavings.toFixed(2)}`, marginRight, y, { align: 'right' });
+  y += 5.5;
+
+  drawDashedLine(y);
+  y += 5.5;
+
+  // Payment Collections
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9);
+  doc.text('PAYMENT COLLECTIONS BREAKDOWN:', marginLeft, y);
+  y += 4.5;
+
+  doc.setFont('courier', 'normal');
+  doc.text(`• Cash Collections : Rs. ${cashTotal.toFixed(2)} (${cashPct}%)  [ ${cashCount} Bills ]`, marginLeft + 3, y);
+  y += 4.2;
+  doc.text(`• UPI Collections  : Rs. ${upiTotal.toFixed(2)} (${upiPct}%)  [ ${upiCount} Bills ]`, marginLeft + 3, y);
+  y += 4.2;
+  doc.text(`• Parity Verified  : Cash + UPI = Rs. ${(cashTotal + upiTotal).toFixed(2)} [ 100.0% BALANCED ]`, marginLeft + 3, y);
+  y += 5.5;
+
+  // Terminal Collections
+  doc.setFont('courier', 'bold');
+  doc.text('TERMINAL SALES BREAKDOWN:', marginLeft, y);
+  y += 4.5;
+
+  doc.setFont('courier', 'normal');
+  doc.text(`• PC Counter Sales : Rs. ${pcSales.toFixed(2)}  [ ${pcCount} Bills ]`, marginLeft + 3, y);
+  y += 4.2;
+  doc.text(`• Mobile Terminal  : Rs. ${mobileSales.toFixed(2)}  [ ${mobileCount} Bills ]`, marginLeft + 3, y);
+  y += 6;
+
+  drawDashedLine(y);
+  y += 7;
+
+  // =========================================================================
+  // SECTION 2: DAY-WISE SALES BREAKDOWN (THERMAL MONOSPACE TABLE)
+  // =========================================================================
+  ensureSpace(35 + (dayGroups.length * 6));
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(10.5);
+  doc.text('2. DAY-WISE SALES BREAKDOWN', marginLeft, y);
+  y += 4.5;
+  drawDashedLine(y);
+  y += 5;
+
+  // Columns layout
+  const colDate = marginLeft;
+  const colBills = marginLeft + 54;
+  const colCash = marginLeft + 96;
+  const colUPI = marginLeft + 138;
+  const colDayTotal = marginRight;
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9);
+  doc.text('Date', colDate, y);
+  doc.text('Bills', colBills, y, { align: 'right' });
+  doc.text('Cash (Rs)', colCash, y, { align: 'right' });
+  doc.text('UPI (Rs)', colUPI, y, { align: 'right' });
+  doc.text('Total Sales (Rs)', colDayTotal, y, { align: 'right' });
+  y += 3.5;
+  drawDashedLine(y);
+  y += 5;
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(8.5);
+
+  if (dayGroups.length === 0) {
+    doc.text('No transaction data recorded for this period.', pageCenter, y, { align: 'center' });
+    y += 6;
+  } else {
+    for (const grp of dayGroups) {
+      ensureSpace(8);
+      doc.setFont('courier', 'normal');
+      doc.text(grp.displayDate, colDate, y);
+      doc.text(String(grp.completedBills), colBills, y, { align: 'right' });
+      doc.text(grp.cashSales.toFixed(2), colCash, y, { align: 'right' });
+      doc.text(grp.upiSales.toFixed(2), colUPI, y, { align: 'right' });
+      doc.setFont('courier', 'bold');
+      doc.text(grp.totalSales.toFixed(2), colDayTotal, y, { align: 'right' });
+      y += 5;
+    }
   }
 
+  drawDashedLine(y);
+  y += 5;
+
+  // Summary Total Row
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9);
+  doc.text('TOTAL SUMMARY', colDate, y);
+  doc.text(String(completedCount), colBills, y, { align: 'right' });
+  doc.text(cashTotal.toFixed(2), colCash, y, { align: 'right' });
+  doc.text(upiTotal.toFixed(2), colUPI, y, { align: 'right' });
+  doc.text(totalSales.toFixed(2), colDayTotal, y, { align: 'right' });
+  y += 5.5;
+
+  drawDashedLine(y);
+  y += 8;
+
   // =========================================================================
-  // SECTION C: DAILY DETAILS AUDIT
+  // SECTION 3: COMPLETE ITEMISED SALES HISTORY TRANSACTIONS LEDGER
+  // (Full transaction list requested by user: "and i want all sales history in the pdf")
   // =========================================================================
-  ensureSpace(28);
+  ensureSpace(30);
 
-  doc.setFillColor(236, 253, 245);
-  doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(6, 78, 59);
-  doc.text('3. DAILY DETAILS & TERMINAL SPLIT AUDIT', marginLeft + 3, y + 4.6);
-  y += 9;
-
-  dayGroups.forEach((dayGrp) => {
-    ensureSpace(22);
-
-    // Day Header Card
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(marginLeft, y, contentWidth, 19, 1.5, 1.5, 'FD');
-
-    // Date Title Badge
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(6, 78, 59);
-    doc.text(`* ${dayGrp.displayDate}`, marginLeft + 3.5, y + 5);
-
-    // Sales total on the right
-    doc.setFontSize(10);
-    doc.setTextColor(6, 78, 59);
-    doc.text(`Daily Sales: Rs. ${dayGrp.totalSales.toLocaleString('en-IN')}`, marginRight - 3.5, y + 5, { align: 'right' });
-
-    // Inner details - Row 1: Bills & Collections
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(51, 65, 85);
-    doc.text(
-      `Completed: ${dayGrp.completedBills} bill(s) | Voided: ${dayGrp.cancelledBills} bill(s) | Cash: Rs. ${dayGrp.cashSales.toLocaleString('en-IN')} | UPI: Rs. ${dayGrp.upiSales.toLocaleString('en-IN')}`,
-      marginLeft + 3.5,
-      y + 10
-    );
-
-    // Inner details - Row 2: Customer Savings & Terminals
-    const savingsToday = dayGrp.itemDiscounts + dayGrp.comboSavings;
-    doc.text(
-      `Discounts: Rs. ${dayGrp.itemDiscounts.toLocaleString('en-IN')} | Combo Savings: Rs. ${dayGrp.comboSavings.toLocaleString('en-IN')} (Total Savings: Rs. ${savingsToday.toLocaleString('en-IN')})`,
-      marginLeft + 3.5,
-      y + 14.2
-    );
-
-    // Terminal Split badge right aligned
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(5, 150, 105);
-    doc.text(
-      `PC: Rs. ${dayGrp.pcSales.toLocaleString('en-IN')} (${dayGrp.pcCount}) | Mobile: Rs. ${dayGrp.mobileSales.toLocaleString('en-IN')} (${dayGrp.mobileCount})`,
-      marginRight - 3.5,
-      y + 14.2,
-      { align: 'right' }
-    );
-
-    y += 21.5;
+  // Sort bills descending (newest first)
+  const sortedBills = [...(bills || [])].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // =========================================================================
-  // FOOTER (TWO-PASS PAGE NUMBERING)
-  // =========================================================================
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(10.5);
+  doc.text(`3. ITEMISED SALES HISTORY TRANSACTIONS (${sortedBills.length} BILLS)`, marginLeft, y);
+  y += 4.5;
+  drawDashedLine(y);
+  y += 5;
 
-    const footY = pageHeight - 9;
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    doc.line(marginLeft, footY - 3, marginRight, footY - 3);
+  // Header for transaction rows
+  const colTxSNo = marginLeft;
+  const colTxBillNo = marginLeft + 10;
+  const colTxDateTime = marginLeft + 58;
+  const colTxTerm = marginLeft + 108;
+  const colTxPay = marginLeft + 124;
+  const colTxStatus = marginLeft + 140;
+  const colTxAmount = marginRight;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('#', colTxSNo, y);
+  doc.text('Bill Number', colTxBillNo, y);
+  doc.text('Date & Time', colTxDateTime, y);
+  doc.text('Term', colTxTerm, y);
+  doc.text('Pay', colTxPay, y);
+  doc.text('Status', colTxStatus, y);
+  doc.text('Amount (Rs)', colTxAmount, y, { align: 'right' });
+  y += 3.5;
+  drawSolidLine(y, 0.4);
+  y += 4.5;
 
-    doc.text('FESTIVAL CLOTHING — DAILY SALES REPORT', marginLeft, footY);
-    doc.text(`Period: ${periodLabel}`, pageWidth / 2, footY, { align: 'center' });
-    doc.text(`Page ${i} of ${totalPages}`, marginRight, footY, { align: 'right' });
+  if (sortedBills.length === 0) {
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(9);
+    doc.text('*** NO SALES TRANSACTIONS FOUND FOR THE SELECTED PERIOD ***', pageCenter, y, { align: 'center' });
+    y += 8;
+  } else {
+    sortedBills.forEach((bill, index) => {
+      // Need 15mm space for 2 rows + divider
+      ensureSpace(16);
+
+      const sNo = index + 1;
+      const billNo = bill.billNumber || 'N/A';
+      const dateTimeStr = formatDateTime(bill.createdAt);
+      const termType = (bill.terminalType || 'PC').toUpperCase();
+      const payMode = (bill.paymentMethod || 'cash').toUpperCase();
+      const isCancelled = bill.status === 'cancelled';
+      const statusLabel = isCancelled ? 'CANCELLED' : 'PAID';
+      const amtStr = (Number(bill.finalPayableAmount) || 0).toFixed(2);
+
+      // Line 1: Main metadata
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(String(sNo), colTxSNo, y);
+
+      doc.setFont('courier', 'bold');
+      doc.text(billNo, colTxBillNo, y);
+
+      doc.setFont('courier', 'normal');
+      doc.text(dateTimeStr, colTxDateTime, y);
+      doc.text(termType, colTxTerm, y);
+      doc.text(payMode, colTxPay, y);
+
+      if (isCancelled) {
+        doc.setFont('courier', 'bold');
+        doc.text(statusLabel, colTxStatus, y);
+      } else {
+        doc.text(statusLabel, colTxStatus, y);
+      }
+
+      doc.setFont('courier', 'bold');
+      doc.text(isCancelled ? `[${amtStr}]` : amtStr, colTxAmount, y, { align: 'right' });
+      y += 4;
+
+      // Line 2: Items summary & discounts
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(7.5);
+
+      const itemsText = formatItemsSummary(bill.items);
+      const sub = Number(bill.subtotal || bill.total || 0).toFixed(2);
+      const red = Number(bill.totalReduction || 0);
+      const comb = Number(bill.comboSavings || 0);
+      const discTotal = (red + comb).toFixed(2);
+
+      let subNote = `Items: ${itemsText} | Subtotal: Rs. ${sub}`;
+      if (Number(discTotal) > 0) {
+        subNote += ` | Disc/Combo: -Rs. ${discTotal}`;
+      }
+      if (bill.customerName) {
+        subNote += ` | Cust: ${bill.customerName}`;
+      }
+      if (isCancelled && bill.cancelReason) {
+        subNote += ` | Void Reason: ${bill.cancelReason}`;
+      }
+
+      doc.text(subNote, colTxBillNo, y, { maxWidth: 170 });
+      y += 4.5;
+
+      // Subtle dashed separator between transactions
+      doc.setLineDashPattern([1, 1.5], 0);
+      doc.setLineWidth(0.2);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(marginLeft, y, marginRight, y);
+      y += 4;
+    });
   }
 
-  const cleanPeriod = (dateFilter || 'today').replace(/[^a-zA-Z0-9]/g, '_');
-  const fileName = `FestivalClothing_SalesReport_${cleanPeriod}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  // Final Ledger Totals Summary
+  ensureSpace(24);
+  drawSolidLine(y, 0.4);
+  y += 5;
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(`TOTAL TRANSACTIONS: ${sortedBills.length} Bills (${completedCount} Paid, ${cancelledCount} Cancelled)`, marginLeft, y);
+  doc.text(`NET AUDIT TOTAL: Rs. ${totalSales.toFixed(2)}`, marginRight, y, { align: 'right' });
+  y += 6;
+
+  drawDashedLine(y);
+  y += 6;
+
+  // Closing Thermal Footer
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9);
+  doc.text('*** END OF SALES SUMMARY & TRANSACTIONS REPORT ***', pageCenter, y, { align: 'center' });
+  y += 4.5;
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(8);
+  doc.text('FESTIVAL CLOTHING — MENSWEAR | Chennai - 21', pageCenter, y, { align: 'center' });
+
+  // Two-pass page numbering
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`FESTIVAL CLOTHING POS SYSTEM — MENSWEAR`, marginLeft, pageHeight - 7);
+    doc.text(`Page ${p} of ${totalPages}`, marginRight, pageHeight - 7, { align: 'right' });
+  }
+
+  // File naming
+  const fileDateStr = new Date().toISOString().slice(0, 10);
+  const filterSuffix = (dateFilter || 'today').toUpperCase();
+  const fileName = `FC_Sales_Summary_${filterSuffix}_${fileDateStr}.pdf`;
 
   if (autoDownload) {
     doc.save(fileName);
   }
 
   const blob = doc.output('blob');
-  return { doc, fileName, blob };
+  return { doc, fileName, blob, totalPages };
 }
 
 export default generateSalesSummaryPDF;

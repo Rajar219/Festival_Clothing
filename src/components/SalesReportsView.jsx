@@ -300,18 +300,21 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     };
   }, [filteredBills, allBills, todayStart, yesterdayStart, monthStart]);
 
-  // Download Daily Sales Summary PDF Report
-  const handleDownloadSalesSummaryPDF = () => {
+  // Download Thermal Daily Sales Summary & Transactions PDF Report
+  const handleDownloadSalesSummaryPDF = (scope = 'filtered') => {
     try {
-      showToast('Generating Sales Summary PDF...', 'info');
+      const isAll = scope === 'all';
+      const targetBills = isAll ? allBills : (filteredBills.length > 0 ? filteredBills : allBills);
+      const targetFilter = isAll ? 'all' : dateFilter;
+      showToast(`Generating Thermal Sales Summary & Transactions PDF (${targetFilter.toUpperCase()})...`, 'info');
       generateSalesSummaryPDF({
-        bills: filteredBills,
-        stats,
-        dateFilter,
+        bills: targetBills,
+        stats: isAll ? undefined : stats,
+        dateFilter: targetFilter,
         settings,
         autoDownload: true,
       });
-      showToast(`Sales Summary PDF for ${dateFilter.toUpperCase()} downloaded successfully!`, 'success');
+      showToast(`Thermal Sales Summary PDF (${targetBills.length} Bills) downloaded successfully!`, 'success');
     } catch (err) {
       console.error('Failed to generate sales summary PDF:', err);
       showToast('Error generating PDF report: ' + err.message, 'error');
@@ -583,8 +586,8 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <button
               type="button"
               className="btn-download-sales-pdf"
-              onClick={handleDownloadSalesSummaryPDF}
-              title="Download Daily Sales Summary PDF Report"
+              onClick={() => handleDownloadSalesSummaryPDF('filtered')}
+              title="Download Thermal Daily Sales Summary & Transactions PDF"
             >
               <FileText size={15} />
               <span>Download Sales Summary PDF</span>
@@ -939,11 +942,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <button
                 type="button"
                 className="btn-export-pdf"
-                onClick={handleDownloadSalesSummaryPDF}
-                title="Download Sales Summary Report in PDF format"
+                onClick={() => handleDownloadSalesSummaryPDF('filtered')}
+                title="Download Thermal Sales Summary & Transactions PDF Report"
               >
                 <FileText size={15} />
-                <span>Sales Summary PDF</span>
+                <span>Summary PDF (Thermal)</span>
+              </button>
+              <button
+                type="button"
+                className="btn-export-pdf secondary-export-pdf"
+                onClick={() => handleDownloadSalesSummaryPDF('all')}
+                title="Download Complete All-Time Sales History Ledger in Thermal PDF format"
+              >
+                <FileText size={15} />
+                <span>All Sales History PDF</span>
               </button>
               <button
                 type="button"
@@ -986,8 +998,8 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <button
               type="button"
               className="mobile-download-pdf-chip"
-              onClick={handleDownloadSalesSummaryPDF}
-              title="Download Daily Sales Summary PDF Report"
+              onClick={() => handleDownloadSalesSummaryPDF('filtered')}
+              title="Download Thermal Sales Summary & Transactions PDF Report"
             >
               <FileText size={12} />
               <span>Summary PDF</span>
@@ -1128,12 +1140,23 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           <button
             type="button"
             className="btn-download-sales-pdf"
-            onClick={handleDownloadSalesSummaryPDF}
-            title="Download Daily Sales Summary PDF Report"
+            onClick={() => handleDownloadSalesSummaryPDF('filtered')}
+            title="Download Thermal Sales Summary & Transactions PDF Report"
           >
             <FileText size={15} />
             <span>Download Sales Summary PDF</span>
           </button>
+          {dateFilter !== 'all' && (
+            <button
+              type="button"
+              className="btn-download-sales-pdf secondary-pdf-btn"
+              onClick={() => handleDownloadSalesSummaryPDF('all')}
+              title="Download Complete All-Time Sales History in Thermal PDF format"
+            >
+              <FileText size={15} />
+              <span>All Sales History PDF</span>
+            </button>
+          )}
           <button
             type="button"
             className="btn-refresh-grid"
