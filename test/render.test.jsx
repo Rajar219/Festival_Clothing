@@ -6,6 +6,8 @@ import { POSProvider, normalizePOSView, getInitialPOSView } from '../src/context
 import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
 import { FESTIVE_QUOTES, getBillFestiveQuote } from '../src/services/db';
 import { SalesReportsView } from '../src/components/SalesReportsView';
+import { WhatsAppModal } from '../src/components/WhatsAppModal';
+import { generateWhatsAppDirectChatText } from '../src/utils/receiptGenerator';
 import fs from 'fs';
 import path from 'path';
 
@@ -469,6 +471,36 @@ describe('App Render & Responsive Design Test', () => {
     expect(appHtml).toContain('header-brand-logo-img');
     expect(appHtml).toContain('/logo.png');
     expect(appHtml).toContain('brand-logo-container');
+  });
+
+  it('verifies exact WhatsApp greeting message format and WhatsAppModal rendering', () => {
+    const sampleBill = {
+      id: 'bill_test_wa',
+      billNumber: 'FC-20261107-0042',
+      finalPayableAmount: 1250,
+      customerPhone: '9840012345',
+      customerName: 'Karthik',
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Verify exact message format
+    const text = generateWhatsAppDirectChatText(sampleBill);
+    expect(text).toBe(
+      'Thanks for purchasing from FESTIVAL CLOTHING!\n\nWe truly appreciate your support. Visit us again!\n\nInvoice No: FC-20261107-0042\nTotal Amount: ₹1,250'
+    );
+
+    // 2. Verify WhatsAppModal rendering
+    const modalHtml = renderToString(
+      <POSProvider>
+        <WhatsAppModal isOpen={true} onClose={() => {}} bill={sampleBill} />
+      </POSProvider>
+    );
+
+    expect(modalHtml).toContain('wa-modal-container');
+    expect(modalHtml).toContain('Share WhatsApp Invoice');
+    expect(modalHtml).toContain('FC-20261107-0042');
+    expect(modalHtml).toContain('9840012345');
+    expect(modalHtml).toContain('wa-btn-send-invoice');
   });
 
   describe('Page Refresh Navigation & Route Persistence', () => {

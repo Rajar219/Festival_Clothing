@@ -26,16 +26,17 @@ import {
 export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
   const { showToast, updateBillRecordStatus } = usePOS();
 
-  const [mobileNumber, setMobileNumber] = useState('');
+  const [mobileNumber, setMobileNumber] = useState(bill?.customerPhone || '');
   const [errorMsg, setErrorMsg] = useState('');
   const [canNativeShare, setCanNativeShare] = useState(false);
-  const [sharingStatus, setSharingStatus] = useState('idle'); // 'idle' | 'chat_opened' | 'shared_native'
+  const [sharingStatus, setSharingStatus] = useState('idle'); // 'idle' | 'pc_opened' | 'shared_native'
   const [isPdfReady, setIsPdfReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Cached generated PDF references to avoid redundant generation
   const cachedPdfRef = useRef(null);
   const hasDownloadedRef = useRef(false);
+  const isExecutingRef = useRef(false);
 
   useEffect(() => {
     if (bill?.customerPhone) {
@@ -46,6 +47,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     setErrorMsg('');
     setSharingStatus('idle');
     hasDownloadedRef.current = false;
+    isExecutingRef.current = false;
 
     // Pre-generate Thermal A4 PDF once for this bill
     if (bill) {
@@ -78,12 +80,6 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
 
   if (!isOpen || !bill) return null;
 
-  // Helper to detect mobile device environment
-  const isMobileDevice = () => {
-    if (typeof navigator === 'undefined') return false;
-    return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  };
-
   // Helper to ensure PDF is generated
   const ensurePdf = () => {
     if (cachedPdfRef.current?.blob) {
@@ -100,14 +96,14 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
   };
 
-  // Helper to trigger single download of the PDF
+  // Helper to trigger single download of the PDF on Windows PC
   const triggerPdfDownload = (pdfResult) => {
     if (!pdfResult?.blob) return;
     try {
       const url = URL.createObjectURL(pdfResult.blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = pdfResult.fileName || `Invoice_${bill.billNumber}.pdf`;
+      a.download = pdfResult.fileName || `${bill.billNumber}_Invoice.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -117,134 +113,127 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
   };
 
-  // 1. DIRECT MOBILE SHARE: Web Share API with BOTH PDF file and greeting message together
-  const handleNativeFileShare = async () => {
-    setIsProcessing(true);
-    setErrorMsg('');
-
-    const pdfResult = ensurePdf();
-    if (!pdfResult?.blob) {
-      showToast('Could not generate invoice PDF', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    const message = generateWhatsAppDirectChatText(bill);
-    const pdfFile = new File([pdfResult.blob], pdfResult.fileName || `${bill.billNumber}_Invoice.pdf`, { type: 'application/pdf' });
-
-    const isShareable = typeof navigator !== 'undefined' &&
-      navigator.share &&
-      navigator.canShare &&
-      navigator.canShare({ files: [pdfFile] });
-
-    if (isShareable) {
-      try {
-        await navigator.share({
-          title: `FESTIVAL CLOTHING Invoice #${bill.billNumber}`,
-          text: message,
-          files: [pdfFile],
-        });
-
-        if (updateBillRecordStatus) {
-          const validation = validateIndianMobile(mobileNumber);
-          await updateBillRecordStatus(bill.id, {
-            whatsappStatus: 'shared_native',
-            customerPhone: validation.isValid ? validation.cleanNumber : (bill.customerPhone || ''),
-          });
-        }
-        setSharingStatus('shared_native');
-        showToast('Share sheet opened! Select WhatsApp to complete sending.', 'success');
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          if (onSharingIncomplete) onSharingIncomplete();
-          showToast('Sharing cancelled. Bill remains safely saved.', 'info');
-        } else {
-          console.warn('Native share failed, falling back to desktop protocol:', err);
-          showToast('Native share unavailable, trying direct chat...', 'info');
-          handleSendDesktopWhatsApp();
-        }
-      } finally {
-        setIsProcessing(false);
+  // Helper to test if a specific file can be shared natively
+  const checkCanShareFile = (file) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+        return Boolean(navigator.canShare({ files: [file] }));
       }
-    } else {
-      // Fallback
-      handleSendDesktopWhatsApp();
+    } catch {
+      return false;
     }
+    return false;
   };
 
-  // 2. DESKTOP (WINDOWS / PC): Open ONLY installed WhatsApp Desktop application via protocol deep link
-  const handleSendDesktopWhatsApp = async () => {
-    const validation = validateIndianMobile(mobileNumber);
-    if (!validation.isValid) {
-      setErrorMsg(validation.error);
-      return;
-    }
-
-    setErrorMsg('');
+  // UNIFIED MAIN ACTION: Handles Android Native Web Share (PDF + Message) or PC Desktop WhatsApp
+  const handleSendWhatsAppInvoice = async () => {
+    // Prevent double-click execution
+    if (isExecutingRef.current) return;
+    isExecutingRef.current = true;
     setIsProcessing(true);
+    setErrorMsg('');
 
     try {
-      // Step A: Generate PDF and trigger a single download
+      // 1. Generate or retrieve the invoice PDF as Blob/File
       const pdfResult = ensurePdf();
-      if (pdfResult && !hasDownloadedRef.current) {
-        triggerPdfDownload(pdfResult);
-        hasDownloadedRef.current = true;
+      if (!pdfResult?.blob) {
+        showToast('Could not generate invoice PDF', 'error');
+        return;
       }
 
-      // Step B: Prefill EXACT greeting message:
-      // Thanks for purchasing from FESTIVAL CLOTHING!
-      //
-      // We appreciate your support. Visit us again!
-      //
-      // Invoice No: [Bill Number]
-      // Total: ₹[Bill Total]
+      // 2. Prepare the exact customer greeting and invoice details message
       const message = generateWhatsAppDirectChatText(bill);
-      const cleanPhone = validation.cleanNumber;
+      const fileName = pdfResult.fileName || `${bill.billNumber}_Invoice.pdf`;
+      const pdfFile = new File([pdfResult.blob], fileName, { type: 'application/pdf' });
 
-      // Step C: Open ONLY the installed WhatsApp Desktop app via deep link
-      // whatsapp://send?phone=91[Number]&text=[EncodedText]
-      // Using an anchor tag prevents opening WhatsApp Web or any browser tab
-      const deepLink = `whatsapp://send?phone=91${cleanPhone}&text=${encodeURIComponent(message)}`;
-      const link = document.createElement('a');
-      link.href = deepLink;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // 3. Determine if device supports native file sharing (Android Web Share API)
+      const isNativeShareSupported = checkCanShareFile(pdfFile);
 
-      if (updateBillRecordStatus) {
-        await updateBillRecordStatus(bill.id, {
-          whatsappStatus: 'chat_opened',
-          customerPhone: cleanPhone,
-        });
+      if (isNativeShareSupported) {
+        // =========================================================================
+        // PLATFORM 1: MOBILE (ANDROID)
+        // - ONE native Web Share API call with BOTH PDF file and message
+        // - No separate download
+        // - No separate window opening
+        // =========================================================================
+        try {
+          await navigator.share({
+            title: `FESTIVAL CLOTHING Invoice #${bill.billNumber}`,
+            text: message,
+            files: [pdfFile],
+          });
+
+          // Only executed when the user completes the native share action
+          if (updateBillRecordStatus) {
+            const validation = mobileNumber ? validateIndianMobile(mobileNumber) : { isValid: false };
+            await updateBillRecordStatus(bill.id, {
+              whatsappStatus: 'shared_native',
+              customerPhone: validation.isValid ? validation.cleanNumber : (bill.customerPhone || ''),
+            });
+          }
+          setSharingStatus('shared_native');
+          showToast('Invoice PDF and message shared together!', 'success');
+          onClose();
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            if (onSharingIncomplete) onSharingIncomplete();
+            showToast('Share sheet closed. Bill remains safely saved.', 'info');
+          } else {
+            console.warn('Native share failed:', err);
+            showToast('Could not open share sheet: ' + err.message, 'error');
+          }
+        }
+      } else {
+        // =========================================================================
+        // PLATFORM 2: WINDOWS PC
+        // - Validate customer mobile number
+        // - Download PDF once to local PC
+        // - Open ONLY installed WhatsApp Desktop application via protocol deep link
+        // - Clear, honest fallback: cashier manually attaches already-generated PDF
+        // =========================================================================
+        const validation = validateIndianMobile(mobileNumber);
+        if (!validation.isValid) {
+          setErrorMsg(validation.error);
+          return;
+        }
+
+        const cleanPhone = validation.cleanNumber;
+
+        // Download the PDF once for manual attachment
+        if (!hasDownloadedRef.current) {
+          triggerPdfDownload(pdfResult);
+          hasDownloadedRef.current = true;
+        }
+
+        // Open WhatsApp Desktop via deep link (without opening WhatsApp Web simultaneously)
+        const deepLink = `whatsapp://send?phone=91${cleanPhone}&text=${encodeURIComponent(message)}`;
+        const link = document.createElement('a');
+        link.href = deepLink;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        if (updateBillRecordStatus) {
+          await updateBillRecordStatus(bill.id, {
+            whatsappStatus: 'chat_opened',
+            customerPhone: cleanPhone,
+          });
+        }
+
+        setSharingStatus('pc_opened');
+        showToast(`WhatsApp Desktop opened for +91 ${cleanPhone}. Please attach the downloaded PDF.`, 'info');
       }
-
-      setSharingStatus('chat_opened');
-      showToast(`WhatsApp Desktop opened for +91 ${cleanPhone}! Attach downloaded PDF.`, 'success');
     } catch (err) {
-      console.warn('WhatsApp Desktop launch error:', err);
-      showToast('Error opening WhatsApp Desktop: ' + err.message, 'error');
+      console.warn('WhatsApp sharing error:', err);
+      showToast('Error during WhatsApp sharing: ' + err.message, 'error');
     } finally {
+      isExecutingRef.current = false;
       setIsProcessing(false);
     }
   };
 
-  // 3. MAIN UNIFIED ACTION: Chooses mobile Web Share API or desktop WhatsApp protocol
-  const handleSendWhatsAppInvoice = async () => {
-    const isMobile = isMobileDevice();
-    const pdfResult = ensurePdf();
-
-    // If on mobile and native sharing is supported, trigger Web Share API with PDF + message
-    if (isMobile && canNativeShare && pdfResult?.blob) {
-      await handleNativeFileShare();
-      return;
-    }
-
-    // Otherwise, perform Desktop Windows WhatsApp deep link
-    await handleSendDesktopWhatsApp();
-  };
-
-  // 4. MANUAL FALLBACK TO WHATSAPP WEB (Only if WhatsApp Desktop is not installed on Windows PC)
+  // MANUAL FALLBACK TO WHATSAPP WEB (Only if WhatsApp Desktop is not installed on Windows PC)
   const handleOpenWhatsAppWeb = () => {
     const validation = validateIndianMobile(mobileNumber);
     if (!validation.isValid) {
@@ -257,7 +246,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     window.open(webUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // 5. MANUAL PDF DOWNLOAD: Only triggers when user explicitly taps "Download PDF"
+  // MANUAL PDF DOWNLOAD: Only triggers when user explicitly taps "Download PDF"
   const handleDownloadPDF = () => {
     const pdfResult = ensurePdf();
     if (pdfResult) {
@@ -378,17 +367,21 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
               <Info size={16} />
             </div>
             <div className="wa-guidance-content">
-              {sharingStatus === 'chat_opened' ? (
+              {sharingStatus === 'pc_opened' ? (
                 <p>
-                  <strong>WhatsApp Desktop opened!</strong> Greeting prefilled for +91 {mobileNumber}. The invoice PDF is saved to your computer — simply drag or click 📎 in WhatsApp to attach.
+                  <strong>WhatsApp Desktop opened!</strong> Greeting prefilled for +91 {mobileNumber}. The invoice PDF is saved to your computer — attach it in WhatsApp via paperclip (📎) or drag-and-drop.
                 </p>
               ) : sharingStatus === 'shared_native' ? (
                 <p>
-                  <strong>Share sheet activated!</strong> The invoice PDF and greeting message were passed together to the native share menu. Select WhatsApp to send.
+                  <strong>Shared successfully!</strong> The invoice PDF and greeting message were sent together via native share sheet.
+                </p>
+              ) : canNativeShare ? (
+                <p>
+                  Tap <strong>SHARE INVOICE (PDF + MESSAGE)</strong> to open Android's share sheet with both the invoice PDF and customer greeting attached together. Select WhatsApp to send.
                 </p>
               ) : (
                 <p>
-                  Tap <strong>SEND WHATSAPP INVOICE</strong> to open customer chat with prefilled greeting and ready-to-attach invoice PDF.
+                  Enter customer's 10-digit mobile number and click <strong>OPEN WHATSAPP &amp; DOWNLOAD PDF</strong>. WhatsApp Desktop opens to the chat with greeting prefilled, and PDF downloads ready to attach.
                 </p>
               )}
             </div>
@@ -408,8 +401,8 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
                 {isProcessing
                   ? 'Connecting...'
                   : canNativeShare
-                  ? 'SHARE INVOICE ON WHATSAPP'
-                  : 'SEND WHATSAPP INVOICE'}
+                  ? 'SHARE INVOICE (PDF + MESSAGE)'
+                  : 'OPEN WHATSAPP & DOWNLOAD PDF'}
               </span>
             </button>
 
