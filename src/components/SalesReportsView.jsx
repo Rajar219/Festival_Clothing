@@ -666,30 +666,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               </div>
             </div>
 
-            {/* 5. Total Item Discounts */}
-            <div className="kpi-card savings-kpi">
-              <div className="kpi-icon-box">
-                <Tag size={22} />
-              </div>
-              <div className="kpi-data">
-                <span className="kpi-title">Total Discounts</span>
-                <span className="kpi-value">{formatINR(stats.totalDiscounts, true)}</span>
-                <span className="kpi-subtext">Item-level reductions</span>
-              </div>
-            </div>
-
-            {/* 6. Combo Savings */}
-            <div className="kpi-card combo-kpi">
-              <div className="kpi-icon-box">
-                <Package size={22} />
-              </div>
-              <div className="kpi-data">
-                <span className="kpi-title">Combo Savings</span>
-                <span className="kpi-value">{formatINR(stats.totalComboSavings, true)}</span>
-                <span className="kpi-subtext">Bundle package savings</span>
-              </div>
-            </div>
-
             {/* Desktop-only bonus cards */}
             <div className="kpi-card yesterday-kpi desktop-only">
               <div className="kpi-icon-box">
@@ -800,51 +776,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   style={{
                     width: stats.totalSales > 0 ? `${(stats.upiTotal / stats.totalSales) * 100}%` : '50%',
                   }}
-                />
-              </div>
-            </div>
-
-            {/* Discount and Combo Analysis Card */}
-            <div className="report-distribution-card">
-              <div className="dist-header">
-                <div className="dist-title-wrap">
-                  <Tag size={18} className="dist-icon" />
-                  <h3>Savings Analysis (Discounts vs Combos)</h3>
-                </div>
-                <span className="dist-badge">Customer Value</span>
-              </div>
-
-              <div className="dist-stats-row">
-                <div className="dist-col">
-                  <span className="dist-label">Item Discounts</span>
-                  <span className="dist-value">{formatINR(stats.totalDiscounts, true)}</span>
-                  <span className="dist-sub">Direct reductions</span>
-                </div>
-                <div className="dist-divider-v" />
-                <div className="dist-col">
-                  <span className="dist-label">Combo Savings</span>
-                  <span className="dist-value">{formatINR(stats.totalComboSavings, true)}</span>
-                  <span className="dist-sub">Package bundle savings</span>
-                </div>
-              </div>
-
-              {/* Visual Split Bar */}
-              <div className="dist-bar-track">
-                <div
-                  className="dist-bar-fill discount"
-                  style={{
-                    width: stats.totalCustomerSavings > 0 ? `${(stats.totalDiscounts / stats.totalCustomerSavings) * 100}%` : '50%',
-                    background: '#f59e0b',
-                  }}
-                  title={`Discounts: ${stats.totalCustomerSavings > 0 ? Math.round((stats.totalDiscounts / stats.totalCustomerSavings) * 100) : 0}%`}
-                />
-                <div
-                  className="dist-bar-fill combo"
-                  style={{
-                    width: stats.totalCustomerSavings > 0 ? `${(stats.totalComboSavings / stats.totalCustomerSavings) * 100}%` : '50%',
-                    background: '#059669',
-                  }}
-                  title={`Combos: ${stats.totalCustomerSavings > 0 ? Math.round((stats.totalComboSavings / stats.totalCustomerSavings) * 100) : 0}%`}
                 />
               </div>
             </div>
@@ -1204,21 +1135,22 @@ export function SalesReportsView({ defaultTab = 'history' }) {
           <table className="ledger-table">
             <thead>
               <tr>
-                <th className="text-center" style={{ width: '48px' }}>S.NO</th>
-                <th style={{ minWidth: '150px' }}>BILL NUMBER</th>
+                <th className="text-center col-sno" style={{ width: '40px' }}>S.NO</th>
+                <th className="col-bill-no" style={{ minWidth: '125px' }}>BILL NUMBER</th>
+                <th className="text-right col-final-amt" style={{ minWidth: '100px' }}>FINAL AMOUNT</th>
                 <th style={{ minWidth: '135px' }}>DATE & TIME</th>
-                <th style={{ minWidth: '90px' }}>CASHIER</th>
-                <th style={{ minWidth: '175px' }}>ITEMS SUMMARY</th>
-                <th className="text-right" style={{ minWidth: '110px' }}>FINAL AMOUNT</th>
-                <th className="text-center" style={{ minWidth: '90px' }}>PAYMENT</th>
-                <th className="text-center" style={{ minWidth: '100px' }}>STATUS</th>
+                <th style={{ minWidth: '85px' }}>CASHIER</th>
+                <th style={{ minWidth: '170px' }}>PRODUCTS / ITEMS SUMMARY</th>
+                <th className="text-right" style={{ minWidth: '105px' }}>ORIGINAL AMOUNT</th>
+                <th className="text-center" style={{ minWidth: '85px' }}>PAYMENT</th>
+                <th className="text-center" style={{ minWidth: '95px' }}>STATUS</th>
                 <th className="text-center" style={{ minWidth: '175px', whiteSpace: 'nowrap' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredBills.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center empty-ledger-cell">
+                  <td colSpan={10} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
                     <p>No bills found for the selected filter criteria.</p>
                     <button
@@ -1240,14 +1172,20 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               ) : (
                 filteredBills.map((bill, index) => {
                   const isCancelled = bill.status === 'cancelled';
+                  const originalTotal = bill.subtotal || ((bill.items || []).reduce((sum, i) => sum + ((i.originalPrice || i.price || 0) * (i.qty || 1)), 0)) || bill.finalPayableAmount;
 
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
-                      <td className="text-center">
+                      <td className="text-center col-sno">
                         <span className="serial-number-badge">{filteredBills.length - index}</span>
                       </td>
-                      <td>
+                      <td className="col-bill-no">
                         <strong className="bill-number-text">{bill.billNumber}</strong>
+                      </td>
+                      <td className="text-right col-final-amt">
+                        <strong className={`final-amount-text ${isCancelled ? 'struck' : ''}`}>
+                          {formatINR(bill.finalPayableAmount, false)}
+                        </strong>
                       </td>
                       <td>
                         <span className="timestamp-text">{formatDateTime(bill.createdAt)}</span>
@@ -1261,9 +1199,9 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         </span>
                       </td>
                       <td className="text-right">
-                        <strong className={`final-amount-text ${isCancelled ? 'struck' : ''}`}>
-                          {formatINR(bill.finalPayableAmount, false)}
-                        </strong>
+                        <span className="original-amount-text">
+                          {formatINR(originalTotal, false)}
+                        </span>
                       </td>
                       <td className="text-center">
                         <span className={`badge-payment ${bill.paymentMethod}`}>
@@ -1340,13 +1278,13 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             {filteredBills.length > 0 && (
               <tfoot>
                 <tr className="ledger-table-grand-total-row">
-                  <td colSpan={5} className="text-right ledger-tfoot-label">
+                  <td colSpan={2} className="text-right ledger-tfoot-label">
                     Grand Total ({stats.validCount} {stats.validCount === 1 ? 'Bill' : 'Bills'}):
                   </td>
-                  <td className="text-right font-mono ledger-tfoot-amount">
+                  <td className="text-right font-mono ledger-tfoot-amount col-final-amt">
                     {formatINR(stats.totalSales, true)}
                   </td>
-                  <td colSpan={3}></td>
+                  <td colSpan={7}></td>
                 </tr>
               </tfoot>
             )}

@@ -394,6 +394,61 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('font-weight: 800');
   });
 
+  it('verifies Mobile Sales History features S.NO, BILL NUMBER, and FINAL AMOUNT as sticky columns', () => {
+    const historyHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="history" />
+      </POSProvider>
+    );
+
+    // Verify sticky class names on table headers
+    expect(historyHtml).toContain('col-sno');
+    expect(historyHtml).toContain('col-bill-no');
+    expect(historyHtml).toContain('col-final-amt');
+    expect(historyHtml).toContain('ORIGINAL AMOUNT');
+
+    // Verify column order: S.NO -> BILL NUMBER -> FINAL AMOUNT
+    const snoIdx = historyHtml.indexOf('col-sno');
+    const billNoIdx = historyHtml.indexOf('col-bill-no');
+    const finalAmtIdx = historyHtml.indexOf('col-final-amt');
+    expect(snoIdx).toBeLessThan(billNoIdx);
+    expect(billNoIdx).toBeLessThan(finalAmtIdx);
+
+    // Check CSS sticky rules for mobile
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+    expect(cssContent).toContain('.ledger-table .col-final-amt');
+    expect(cssContent).toContain('box-shadow: 4px 0 6px -2px');
+  });
+
+  it('verifies Reports view removed Total Discounts and Combo Savings from KPI cards and distribution', () => {
+    const reportsHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="reports" />
+      </POSProvider>
+    );
+
+    // Must NOT contain Total Discounts or Combo Savings KPI cards
+    expect(reportsHtml).not.toContain('savings-kpi');
+    expect(reportsHtml).not.toContain('combo-kpi');
+    expect(reportsHtml).not.toContain('Savings Analysis (Discounts vs Combos)');
+
+    // Must contain the 4 primary operational KPI cards
+    expect(reportsHtml).toContain('today-kpi');
+    expect(reportsHtml).toContain('total-kpi');
+    expect(reportsHtml).toContain('cash-kpi');
+    expect(reportsHtml).toContain('upi-kpi');
+  });
+
+  it('verifies Header title uses luxury retail typography with letter-spacing', () => {
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    expect(cssContent).toContain('.brand-main-title');
+    expect(cssContent).toContain('letter-spacing: 2px');
+    expect(cssContent).toContain('Plus Jakarta Sans');
+  });
+
   describe('Page Refresh Navigation & Route Persistence', () => {
     it('verifies normalizePOSView normalizes views and maps sales to history', () => {
       expect(normalizePOSView('history')).toBe('history');

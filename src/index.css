@@ -164,12 +164,17 @@ kbd {
 }
 
 .brand-main-title {
-  font-size: 1.15rem;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.18rem;
   font-weight: 800;
-  letter-spacing: 0.5px;
+  letter-spacing: 2px;
   color: #ffffff;
   text-transform: uppercase;
   white-space: nowrap;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 65%, #d1fae5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
 .brand-subtitle-badge {
@@ -3012,50 +3017,100 @@ kbd {
   height: 44px;
 }
 
-/* Sticky Left Columns for Smooth Horizontal Swiping on Mobile & Desktop */
+/* Sticky Left Columns for Smooth Horizontal Swiping on Mobile & Desktop:
+   Column 1: S.NO (left: 0, width: 40px)
+   Column 2: BILL NUMBER (left: 40px, width: 125px)
+   Column 3: FINAL AMOUNT (left: 165px, width: 100px, sticky with right edge drop-shadow)
+*/
 .ledger-table th:first-child,
-.ledger-table td:first-child {
+.ledger-table td:first-child,
+.ledger-table .col-sno {
   position: sticky;
   left: 0;
   z-index: 2;
   background: #ffffff;
-  width: 48px;
-  min-width: 48px;
-  max-width: 48px;
+  width: 40px;
+  min-width: 40px;
+  max-width: 44px;
+  text-align: center;
 }
 
-.ledger-table thead th:first-child {
-  z-index: 3;
+.ledger-table thead th:first-child,
+.ledger-table thead th.col-sno {
+  z-index: 4;
   background: #f8fafc;
 }
 
 .ledger-table tfoot td:first-child {
-  z-index: 3;
+  position: sticky;
+  left: 0;
+  z-index: 4;
   background: #f8fafc;
 }
 
 .ledger-table th:nth-child(2),
-.ledger-table td:nth-child(2) {
+.ledger-table td:nth-child(2),
+.ledger-table .col-bill-no {
   position: sticky;
-  left: 48px;
+  left: 40px;
   z-index: 2;
   background: #ffffff;
-  box-shadow: 3px 0 5px -2px rgba(0, 0, 0, 0.1);
+  width: 125px;
+  min-width: 125px;
 }
 
-.ledger-table thead th:nth-child(2) {
-  z-index: 3;
+.ledger-table thead th:nth-child(2),
+.ledger-table thead th.col-bill-no {
+  z-index: 4;
   background: #f8fafc;
 }
 
+.ledger-table th:nth-child(3),
+.ledger-table td:nth-child(3),
+.ledger-table .col-final-amt {
+  position: sticky;
+  left: 165px;
+  z-index: 2;
+  background: #ffffff;
+  width: 100px;
+  min-width: 100px;
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.12);
+  text-align: right;
+}
+
+.ledger-table thead th:nth-child(3),
+.ledger-table thead th.col-final-amt {
+  z-index: 4;
+  background: #f8fafc;
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.12);
+}
+
+.ledger-table tfoot td:nth-child(2),
+.ledger-table tfoot td.col-final-amt {
+  position: sticky;
+  left: 165px;
+  z-index: 4;
+  background: #f8fafc;
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.12);
+}
+
 .ledger-row:hover td:first-child,
-.ledger-row:hover td:nth-child(2) {
+.ledger-row:hover td:nth-child(2),
+.ledger-row:hover td:nth-child(3) {
   background: #f1f5f9;
 }
 
 .ledger-row.row-cancelled td:first-child,
-.ledger-row.row-cancelled td:nth-child(2) {
+.ledger-row.row-cancelled td:nth-child(2),
+.ledger-row.row-cancelled td:nth-child(3) {
   background: #fef2f2;
+}
+
+.original-amount-text {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 500;
 }
 
 .mobile-table-swipe-hint {
@@ -3492,13 +3547,18 @@ kbd {
   }
 
   .brand-main-title {
-    font-size: 0.8rem !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 0.84rem !important;
     font-weight: 800 !important;
     color: #ffffff !important;
-    letter-spacing: -0.2px !important;
+    letter-spacing: 1.2px !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 65%, #d1fae5 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)) !important;
   }
 
   .brand-subtitle-badge {
@@ -3965,19 +4025,81 @@ kbd {
   }
 
   .ledger-table {
-    min-width: 780px !important;
+    min-width: 840px !important;
     width: 100% !important;
   }
 
   .ledger-table th {
-    padding: 7px 8px !important;
+    padding: 7px 6px !important;
     font-size: 0.68rem !important;
   }
 
   .ledger-table td {
-    padding: 6px 8px !important;
+    padding: 6px 6px !important;
     font-size: 0.76rem !important;
     height: 38px !important;
+  }
+
+  .ledger-table .col-sno,
+  .ledger-table th:first-child,
+  .ledger-table td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 40px !important;
+    padding: 6px 4px !important;
+    text-align: center !important;
+    background: #ffffff !important;
+    z-index: 2 !important;
+  }
+
+  .ledger-table .col-bill-no,
+  .ledger-table th:nth-child(2),
+  .ledger-table td:nth-child(2) {
+    position: sticky !important;
+    left: 36px !important;
+    width: 118px !important;
+    min-width: 118px !important;
+    max-width: 122px !important;
+    background: #ffffff !important;
+    z-index: 2 !important;
+  }
+
+  .ledger-table .col-final-amt,
+  .ledger-table th:nth-child(3),
+  .ledger-table td:nth-child(3) {
+    position: sticky !important;
+    left: 154px !important;
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 95px !important;
+    box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.14) !important;
+    text-align: right !important;
+    background: #ffffff !important;
+    z-index: 2 !important;
+  }
+
+  .ledger-table thead th:first-child,
+  .ledger-table thead th:nth-child(2),
+  .ledger-table thead th:nth-child(3) {
+    z-index: 5 !important;
+    background: #f8fafc !important;
+  }
+
+  .ledger-table tfoot td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 5 !important;
+    background: #f8fafc !important;
+  }
+
+  .ledger-table tfoot td:nth-child(2) {
+    position: sticky !important;
+    left: 154px !important;
+    z-index: 5 !important;
+    background: #f8fafc !important;
+    box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.14) !important;
   }
 
   .bill-number-text {

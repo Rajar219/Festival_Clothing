@@ -340,15 +340,11 @@ export function generateSalesSummaryPDF({
   doc.setFont('courier', 'normal');
 
   doc.text(`Total Completed Bills : ${completedCount}`, marginLeft, y);
-  doc.text(`Gross Merchandise Value : Rs. ${grossValue.toFixed(2)}`, marginRight, y, { align: 'right' });
+  doc.text(`Total Realised Sales  : Rs. ${totalSales.toFixed(2)}`, marginRight, y, { align: 'right' });
   y += 4.5;
 
   doc.text(`Cancelled Bills (Void): ${cancelledCount}`, marginLeft, y);
-  doc.text(`Total Item Reductions   : -Rs. ${totalDiscounts.toFixed(2)}`, marginRight, y, { align: 'right' });
-  y += 4.5;
-
-  doc.text(`Total Units Sold      : ${totalUnitsSold} Pcs`, marginLeft, y);
-  doc.text(`Total Combo Savings     : -Rs. ${totalComboSavings.toFixed(2)}`, marginRight, y, { align: 'right' });
+  doc.text(`Total Units Sold      : ${totalUnitsSold} Pcs`, marginRight, y, { align: 'right' });
   y += 5.5;
 
   drawDashedLine(y);
@@ -357,7 +353,7 @@ export function generateSalesSummaryPDF({
   doc.setFont('courier', 'bold');
   doc.setFontSize(10.5);
   doc.text(`TOTAL NET SALES       : Rs. ${totalSales.toFixed(2)}`, marginLeft, y);
-  doc.text(`TOTAL CUSTOMER SAVINGS  : Rs. ${totalSavings.toFixed(2)}`, marginRight, y, { align: 'right' });
+  doc.text(`COMPLETED TRANSACTIONS: ${completedCount} Bills`, marginRight, y, { align: 'right' });
   y += 5.5;
 
   drawDashedLine(y);
@@ -550,10 +546,7 @@ export function generateSalesSummaryPDF({
       const comb = Number(bill.comboSavings || 0);
       const discTotal = (red + comb).toFixed(2);
 
-      let subNote = `Items: ${itemsText} | Subtotal: Rs. ${sub}`;
-      if (Number(discTotal) > 0) {
-        subNote += ` | Disc/Combo: -Rs. ${discTotal}`;
-      }
+      let subNote = `Items: ${itemsText}`;
       if (bill.customerName) {
         subNote += ` | Cust: ${bill.customerName}`;
       }
