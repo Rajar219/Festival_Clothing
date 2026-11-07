@@ -42,7 +42,8 @@ export function validateIndianMobile(raw) {
 
 export function generateWhatsAppDirectChatText(bill) {
   const billNumber = bill?.billNumber || '';
-  return `Thanks for purchasing from FESTIVAL CLOTHING!\n\nWe appreciate your support. Visit us again!\n\nInvoice No: ${billNumber}`;
+  const total = Number(bill?.finalPayableAmount !== undefined ? bill.finalPayableAmount : (bill?.total || 0)).toLocaleString('en-IN');
+  return `Thanks for purchasing from FESTIVAL CLOTHING!\n\nWe appreciate your support. Visit us again!\n\nInvoice No: ${billNumber}\nTotal: ₹${total}`;
 }
 
 /**

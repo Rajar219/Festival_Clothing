@@ -6560,3 +6560,403 @@ kbd {
   border: 1px solid #a7f3d0;
   flex-shrink: 0;
 }
+
+/* ==========================================================================
+   FESTIVAL CLOTHING POS - REDESIGNED WHATSAPP MODAL
+   Emerald & white luxury menswear aesthetic with robust responsive layout
+   ========================================================================== */
+
+.wa-modal-container {
+  max-width: 480px;
+  width: 92%;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(6, 78, 59, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  border-top: 4px solid #059669;
+  overflow: hidden;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.wa-modal-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fafaf9;
+}
+
+.wa-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wa-header-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25);
+}
+
+.wa-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #064e3b;
+  letter-spacing: -0.01em;
+}
+
+.wa-modal-subtitle {
+  font-size: 0.76rem;
+  color: #64748b;
+  display: block;
+  margin-top: 2px;
+}
+
+.wa-modal-close-btn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wa-modal-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.wa-modal-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: calc(85vh - 120px);
+}
+
+/* Bill Summary Card */
+.wa-bill-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wa-summary-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wa-bill-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-bill-num-badge {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #0f172a;
+  background: #ffffff;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.wa-bill-status-pill {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  padding: 2px 7px;
+  border-radius: 12px;
+  letter-spacing: 0.04em;
+}
+
+.wa-total-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.wa-total-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.wa-total-amount {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #064e3b;
+  font-family: var(--font-mono, monospace);
+}
+
+.wa-summary-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.wa-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wa-status-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.wa-pill-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #065f46;
+  background: #ecfdf5;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #a7f3d0;
+}
+
+.wa-pill-verified.ready {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+/* Phone Number Field */
+.wa-phone-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wa-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wa-phone-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: all 0.18s ease;
+}
+
+.wa-phone-input-wrap:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.wa-phone-input-wrap.has-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.wa-phone-input-wrap.is-valid {
+  border-color: #10b981;
+}
+
+.wa-country-flag {
+  background: #f8fafc;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #334155;
+  border-right: 1.5px solid #cbd5e1;
+  user-select: none;
+}
+
+.wa-phone-text-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  min-width: 0;
+}
+
+.wa-phone-text-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.wa-input-valid-indicator {
+  padding-right: 12px;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+}
+
+.wa-field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Guidance / Instructions Card */
+.wa-guidance-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.wa-guidance-icon-wrap {
+  color: #059669;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.wa-guidance-content p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #166534;
+  line-height: 1.45;
+}
+
+/* Action Buttons */
+.wa-actions-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.wa-btn-main {
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2);
+}
+
+.wa-btn-share-native,
+.wa-btn-open-chat {
+  background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
+  color: #ffffff;
+}
+
+.wa-btn-main:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(6, 78, 59, 0.3);
+}
+
+.wa-btn-main:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.wa-btn-main:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wa-secondary-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-btn-sub {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wa-btn-sub:hover {
+  background: #f8fafc;
+  border-color: #059669;
+  color: #064e3b;
+}
+
+/* Modal Footer */
+.wa-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #fafaf9;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.wa-btn-dismiss {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wa-btn-dismiss:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
