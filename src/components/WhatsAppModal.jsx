@@ -167,8 +167,8 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
   };
 
-  // 2. DIRECT CHAT: wa.me click-to-chat without forcing download
-  const handleDirectCustomerChat = async (isFallback = false) => {
+  // 2. PRIMARY ACTION: Send WhatsApp Invoice directly to entered customer number
+  const handleSendWhatsAppInvoice = async () => {
     const validation = validateIndianMobile(mobileNumber);
     if (!validation.isValid) {
       setErrorMsg(validation.error);
@@ -178,24 +178,43 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     setErrorMsg('');
     setIsProcessing(true);
 
-    // Prefill greeting message directly
-    const message = generateWhatsAppDirectChatText(bill);
-    const waUrl = `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(message)}`;
+    try {
+      // Step A: Ensure Thermal A4 invoice PDF is generated and downloaded immediately
+      const pdfResult = ensurePdf();
+      if (pdfResult) {
+        triggerPdfDownload(pdfResult);
+      }
 
-    // Open exact customer WhatsApp chat directly (NO auto-download popup!)
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+      // Step B: Prefill greeting message:
+      // Thanks for purchasing from FESTIVAL CLOTHING!
+      // We appreciate your support. Visit us again!
+      // Invoice No: [Bill Number]
+      // Total: ₹[Bill Amount]
+      const message = generateWhatsAppDirectChatText(bill);
+      const cleanPhone = validation.cleanNumber;
+      const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-    if (updateBillRecordStatus) {
-      await updateBillRecordStatus(bill.id, {
-        whatsappStatus: 'chat_opened',
-        customerPhone: validation.cleanNumber,
-      });
+      // Step C: Open exact customer's WhatsApp chat using their entered number
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+      if (updateBillRecordStatus) {
+        await updateBillRecordStatus(bill.id, {
+          whatsappStatus: 'chat_opened',
+          customerPhone: cleanPhone,
+        });
+      }
+
+      setSharingStatus('chat_opened');
+      showToast(`WhatsApp chat opened for +91 ${cleanPhone}! Invoice PDF downloaded.`, 'success');
+    } catch (err) {
+      console.warn('WhatsApp direct send error:', err);
+      showToast('Error opening WhatsApp: ' + err.message, 'error');
+    } finally {
+      setIsProcessing(false);
     }
-
-    setSharingStatus('chat_opened');
-    showToast(`WhatsApp chat opened for +91 ${validation.cleanNumber}.`, 'success');
-    setIsProcessing(false);
   };
+
+  const handleDirectCustomerChat = handleSendWhatsAppInvoice;
 
   // 3. MANUAL PDF DOWNLOAD: Only triggers when user explicitly taps "Download PDF"
   const handleDownloadPDF = () => {
@@ -319,19 +338,11 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
             <div className="wa-guidance-content">
               {sharingStatus === 'chat_opened' ? (
                 <p>
-                  <strong>WhatsApp chat opened!</strong> Customer greeting prefilled. Use the <strong>Download PDF</strong> button below if you also want to save a file copy on this PC.
-                </p>
-              ) : sharingStatus === 'shared_native' ? (
-                <p>
-                  <strong>Direct share opened!</strong> Select WhatsApp to send both the PDF invoice and greeting directly to the customer.
-                </p>
-              ) : canNativeShare ? (
-                <p>
-                  Click <strong>Share PDF Directly</strong> to send the invoice and greeting directly to WhatsApp without downloading to your computer.
+                  <strong>WhatsApp chat opened!</strong> Greeting prefilled for +91 {mobileNumber}. The invoice PDF is downloaded to your device and ready to attach (tap 📎 Paperclip &gt; Document).
                 </p>
               ) : (
                 <p>
-                  Click <strong>Open Customer WhatsApp Chat</strong> to launch the customer's chat directly with greeting prefilled.
+                  Enter customer's 10-digit mobile number and tap <strong>SEND WHATSAPP INVOICE</strong>. This opens their exact chat with greeting prefilled and downloads the PDF bill ready to attach.
                 </p>
               )}
             </div>
@@ -339,45 +350,35 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
 
           {/* Action Buttons */}
           <div className="wa-actions-wrapper">
-            {/* Primary Action Button */}
-            {canNativeShare ? (
-              <button
-                type="button"
-                className="wa-btn-main wa-btn-share-native"
-                onClick={handleNativeFileShare}
-                disabled={isProcessing}
-              >
-                <Share2 size={18} />
-                <span>{isProcessing ? 'Preparing Invoice...' : 'SHARE PDF + GREETING (DIRECTLY)'}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="wa-btn-main wa-btn-open-chat"
-                onClick={() => handleDirectCustomerChat(false)}
-                disabled={isProcessing}
-              >
-                <Send size={18} />
-                <span>{isProcessing ? 'Opening WhatsApp...' : 'OPEN CUSTOMER WHATSAPP CHAT'}</span>
-              </button>
-            )}
+            {/* Primary Action Button: Open exact customer WhatsApp chat with greeting prefilled + PDF downloaded */}
+            <button
+              type="button"
+              className="wa-btn-main wa-btn-send-invoice"
+              onClick={handleSendWhatsAppInvoice}
+              disabled={isProcessing}
+            >
+              <Send size={18} />
+              <span>{isProcessing ? 'Opening WhatsApp...' : 'SEND WHATSAPP INVOICE'}</span>
+            </button>
 
-            {/* Secondary Action Row: Always offers Direct Chat + Download PDF */}
+            {/* Secondary Action Row */}
             <div className="wa-secondary-actions-bar">
-              <button
-                type="button"
-                className="wa-btn-sub"
-                onClick={() => handleDirectCustomerChat(false)}
-                title="Open direct WhatsApp chat without downloading"
-              >
-                <Send size={14} />
-                <span>Open Direct Chat</span>
-              </button>
+              {canNativeShare && (
+                <button
+                  type="button"
+                  className="wa-btn-sub"
+                  onClick={handleNativeFileShare}
+                  title="Open system share sheet with PDF attached"
+                >
+                  <Share2 size={14} />
+                  <span>Share Sheet (With PDF)</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="wa-btn-sub"
                 onClick={handleDownloadPDF}
-                title="Download A4 invoice PDF copy to your device"
+                title="Download Thermal A4 invoice PDF copy to your device"
               >
                 <Download size={14} />
                 <span>Download PDF</span>

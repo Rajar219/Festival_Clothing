@@ -340,4 +340,20 @@ describe('App Render & Responsive Design Test', () => {
     expect(reportsHtml.toUpperCase()).toContain('S.NO');
     expect(reportsHtml).toContain('Reports &amp; Analytics');
   });
+
+  it('verifies Mobile Sales History line-by-line table CSS classes exist for 360px-430px screens', () => {
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    expect(cssContent).toContain('.mobile-table-card');
+    expect(cssContent).toContain('.mobile-table-card-header');
+    expect(cssContent).toContain('.mobile-table-rows');
+    expect(cssContent).toContain('.mobile-table-row');
+    expect(cssContent).toContain('.mobile-table-label');
+    expect(cssContent).toContain('.mobile-table-value');
+    expect(cssContent).toContain('.final-amount-row');
+    expect(cssContent).toContain('.final-amount-val');
+    expect(cssContent).toContain('.mobile-table-actions-primary');
+    expect(cssContent).toContain('.mobile-table-actions-secondary');
+  });
 });

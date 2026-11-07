@@ -1354,135 +1354,161 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
               const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
 
+              const origAmount = bill.subtotal || (Number(bill.finalPayableAmount) + totalSavings);
+
               return (
-                <div key={bill.id} className={`mobile-bill-card ${isCancelled ? 'card-cancelled' : ''}`}>
-                  {/* ROW 1: Top row: Bill number | PC/Mobile | Payment status */}
-                  <div className="mobile-bill-top-row">
-                    <div className="mobile-bill-id-box">
-                      <span className="mobile-bill-sno-badge">#{filteredBills.length - index}</span>
-                      <strong className="mobile-bill-num">{bill.billNumber}</strong>
+                <div key={bill.id} className={`mobile-table-card ${isCancelled ? 'card-cancelled' : ''}`}>
+                  {/* Card Header: Prominent Bill Number + Terminal & Status Badges */}
+                  <div className="mobile-table-card-header">
+                    <div className="mobile-table-bill-id">
+                      <span className="mobile-table-sno">#{filteredBills.length - index}</span>
+                      <strong className="mobile-table-bill-num">{bill.billNumber}</strong>
                     </div>
-                    <div className="mobile-bill-status-box">
-                      <span className={`terminal-tag ${isMobileTerminal ? 'tag-mobile' : 'tag-pc'}`}>
-                        {isMobileTerminal ? <Smartphone size={11} /> : <Laptop size={11} />}
-                        <span>{isMobileTerminal ? 'Mobile' : 'PC'}</span>
+                    <div className="mobile-table-header-badges">
+                      <span className={`terminal-badge-mini ${isMobileTerminal ? 'mobile' : 'pc'}`}>
+                        {isMobileTerminal ? <Smartphone size={10} /> : <Laptop size={10} />}
+                        <span>{isMobileTerminal ? 'MOBILE' : 'PC'}</span>
                       </span>
                       {isCancelled ? (
-                        <span className="badge-status cancelled">VOIDED</span>
+                        <span className="status-badge-mini cancelled">VOIDED</span>
                       ) : (
-                        <span className="badge-status paid">PAID</span>
+                        <span className="status-badge-mini paid">PAID</span>
                       )}
                     </div>
                   </div>
 
-                  {/* ROW 2: Second row: Date and time */}
-                  <div className="mobile-bill-second-row">
-                    <Clock size={12} className="meta-icon" />
-                    <span className="bill-datetime">{formatDateTime(bill.createdAt)}</span>
-                    {bill.cashierName && (
-                      <span className="bill-cashier-tag">• {bill.cashierName}</span>
-                    )}
-                  </div>
-
-                  {/* ROW 3: Third row: Product summary */}
-                  <div className="mobile-bill-third-row">
-                    {(bill.customerName || bill.customerPhone) && (
-                      <div className="bill-customer-subline">
-                        <User size={11} />
-                        <span>{bill.customerName || 'Customer'}</span>
-                        {bill.customerPhone && <span className="bill-customer-phone">({bill.customerPhone})</span>}
-                      </div>
-                    )}
-                    <div className="bill-products-summary">
-                      {(bill.items || []).map((i) => `${i.name} (×${i.qty})`).join(', ')}
+                  {/* Line-by-Line Structured Table */}
+                  <div className="mobile-table-rows">
+                    {/* Row 1: Date */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Date</span>
+                      <span className="mobile-table-value">{formatDateTime(bill.createdAt)}</span>
                     </div>
-                  </div>
 
-                  {/* ROW 4: Fourth row: Original amount / Savings */}
-                  <div className="mobile-bill-fourth-row">
-                    {totalSavings > 0 ? (
-                      <div className="bill-savings-bar">
-                        <span className="bill-orig-text">Orig: ₹{bill.subtotal || bill.finalPayableAmount}</span>
-                        <span className="bill-savings-tag">Saved -₹{totalSavings}</span>
+                    {/* Row 2: Cashier */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Cashier</span>
+                      <span className="mobile-table-value">{bill.cashierName || 'Cashier 1'}</span>
+                    </div>
+
+                    {/* Customer Info (if present) */}
+                    {(bill.customerName || bill.customerPhone) && (
+                      <div className="mobile-table-row">
+                        <span className="mobile-table-label">Customer</span>
+                        <span className="mobile-table-value">
+                          {bill.customerName || 'Customer'} {bill.customerPhone ? `(${bill.customerPhone})` : ''}
+                        </span>
                       </div>
-                    ) : (
-                      <span className="bill-regular-price">Retail Price (Standard)</span>
                     )}
-                  </div>
 
-                  {/* ROW 5: Fifth row: Final payable amount */}
-                  <div className="mobile-bill-fifth-row">
-                    <div className="bill-final-payable-box">
-                      <span className="payable-label">Final Payable:</span>
-                      <span className={`bill-final-value ${isCancelled ? 'struck' : ''}`}>
+                    {/* Row 3: Products */}
+                    <div className="mobile-table-row products-row">
+                      <span className="mobile-table-label">Products</span>
+                      <span className="mobile-table-value products-list">
+                        {(bill.items || []).map((i) => `${i.name} × ${i.qty}`).join(', ') || 'No items'}
+                      </span>
+                    </div>
+
+                    {/* Row 4: Original Amount */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Original Amount</span>
+                      <span className="mobile-table-value">{formatINR(origAmount, true)}</span>
+                    </div>
+
+                    {/* Row 5: Discount */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Discount</span>
+                      <span className={`mobile-table-value ${totalSavings > 0 ? 'text-discount' : ''}`}>
+                        {totalSavings > 0 ? `₹${totalSavings.toFixed(2)}` : '₹0.00'}
+                      </span>
+                    </div>
+
+                    {/* Row 6: Final Amount (Bold Emerald Green Highlight) */}
+                    <div className="mobile-table-row final-amount-row">
+                      <span className="mobile-table-label">Final Amount</span>
+                      <span className={`mobile-table-value final-amount-val ${isCancelled ? 'struck' : ''}`}>
                         {formatINR(bill.finalPayableAmount, true)}
                       </span>
                     </div>
-                    <span className={`badge-payment-sm ${bill.paymentMethod || 'cash'}`}>
-                      {(bill.paymentMethod || 'cash').toUpperCase()}
-                    </span>
+
+                    {/* Row 7: Payment */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Payment</span>
+                      <span className={`mobile-table-value payment-badge ${(bill.paymentMethod || 'cash').toLowerCase()}`}>
+                        {(bill.paymentMethod || 'cash').toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Row 8: Sync Status */}
+                    <div className="mobile-table-row">
+                      <span className="mobile-table-label">Sync Status</span>
+                      <span className="mobile-table-value sync-status-val">
+                        <span className="sync-dot-mini synced" />
+                        <span>Synced</span>
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Actions: Details | WhatsApp | PDF | Print */}
-                  <div className="mobile-bill-primary-actions">
+                  {/* Actions Row 1: Details | WhatsApp | PDF | Print */}
+                  <div className="mobile-table-actions-primary">
                     <button
                       type="button"
-                      className="mobile-action-btn view"
+                      className="mobile-tbl-btn details"
                       onClick={() => setSelectedBill(bill)}
                       title="View bill details"
                     >
-                      <Eye size={14} />
+                      <Eye size={13} />
                       <span>Details</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-action-btn whatsapp"
+                      className="mobile-tbl-btn whatsapp"
                       onClick={() => setWhatsAppBill(bill)}
                       title="Share on WhatsApp"
                     >
-                      <Send size={14} />
+                      <Send size={13} />
                       <span>WhatsApp</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-action-btn download"
+                      className="mobile-tbl-btn pdf"
                       onClick={() => handleDownloadBillPDF(bill)}
                       title="Download PDF"
                     >
-                      <Download size={14} />
+                      <Download size={13} />
                       <span>PDF</span>
                     </button>
                     <button
                       type="button"
-                      className="mobile-action-btn print"
+                      className="mobile-tbl-btn print"
                       onClick={() => triggerPrint(bill, 'thermal')}
                       title="Reprint receipt"
                     >
-                      <Printer size={14} />
+                      <Printer size={13} />
                       <span>Print</span>
                     </button>
                   </div>
 
-                  {/* Secondary action area: Void and Delete with confirmation */}
-                  <div className="mobile-bill-secondary-actions">
+                  {/* Actions Row 2: Void Bill | Delete */}
+                  <div className="mobile-table-actions-secondary">
                     {!isCancelled && (
                       <button
                         type="button"
-                        className="mobile-secondary-btn void"
+                        className="mobile-tbl-btn-secondary void"
                         onClick={() => handleAttemptCancel(bill)}
                         title="Void this bill"
                       >
-                        <Ban size={12} />
+                        <Ban size={11} />
                         <span>Void Bill</span>
                       </button>
                     )}
                     <button
                       type="button"
-                      className="mobile-secondary-btn delete"
+                      className="mobile-tbl-btn-secondary delete"
                       onClick={() => handleAttemptDelete(bill)}
                       title="Delete bill permanently"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={11} />
                       <span>Delete</span>
                     </button>
                   </div>
