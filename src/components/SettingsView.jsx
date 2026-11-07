@@ -46,7 +46,6 @@ import {
   Check,
   X,
   UserCheck,
-  Sparkles,
   Users,
   UserPlus,
   Trash2,

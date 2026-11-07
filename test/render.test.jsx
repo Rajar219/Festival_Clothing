@@ -186,9 +186,10 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('flex-shrink: 0');
     expect(cssContent).toContain('env(safe-area-inset-bottom)');
 
-    // Mobile bottom sheet docking
-    expect(cssContent).toContain('align-items: flex-end');
-    expect(cssContent).toContain('border-radius: 20px 20px 0 0');
+    // Mobile centered floating modal
+    expect(cssContent).toContain('align-items: center');
+    expect(cssContent).toContain('calc(100% - 24px)');
+    expect(cssContent).toContain('border-radius: 16px');
   });
 
   it('verifies CheckoutModal renders SELECT PAYMENT METHOD with CASH and UPI selectable cards and cash/UPI behavior', async () => {

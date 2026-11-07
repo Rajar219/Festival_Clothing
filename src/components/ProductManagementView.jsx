@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Info,
   ShieldAlert,
-  Sparkles,
   Percent,
   Sliders,
   Image as ImageIcon,
@@ -243,7 +242,7 @@ export function ProductManagementView() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
                         {offersList.map((o) => (
                           <span key={o} style={{ color: '#059669', fontWeight: 700, background: '#ecfdf5', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <Sparkles size={10} /> ₹{o}
+                            ₹{o}
                           </span>
                         ))}
                       </div>

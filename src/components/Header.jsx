@@ -97,15 +97,19 @@ export function Header() {
             />
             <div className="brand-text desktop-only">
               <div className="brand-title-row">
-                <span className="brand-main-title">FESTIVAL CLOTHING</span>
-                <span className="brand-subtitle-badge">{settings.subtitle || 'MENSWEAR'}</span>
+                <span className="brand-main-title">FESTIVAL MENSWEAR</span>
+                {settings.subtitle && settings.subtitle !== 'MENSWEAR' && (
+                  <span className="brand-subtitle-badge">{settings.subtitle}</span>
+                )}
                 <span className="wisdo-attribution-badge desktop-only">
                   {COMPANY_BRANDING.attributionText}
                 </span>
               </div>
-              {settings.shopName && settings.shopName !== 'FESTIVAL CLOTHING' && (
-                <span className="brand-custom-name">{settings.shopName}</span>
-              )}
+              {settings.shopName &&
+                settings.shopName !== 'FESTIVAL CLOTHING' &&
+                settings.shopName !== 'FESTIVAL MENSWEAR' && (
+                  <span className="brand-custom-name">{settings.shopName}</span>
+                )}
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useModalBehavior } from '../hooks/useModalBehavior';
 import { formatINR } from '../utils/currency';
-import { Tag, Sparkles, Check, X, AlertTriangle, Minus, Plus } from 'lucide-react';
+import { Tag, Check, X, AlertTriangle, Minus, Plus } from 'lucide-react';
 
 export function PriceSelectorModal({
   isOpen,
@@ -206,7 +206,6 @@ export function PriceSelectorModal({
                     className={`price-pill-btn offer ${isSelected ? 'active' : ''}`}
                     onClick={() => handlePriceButtonClick(offNum)}
                   >
-                    <Sparkles size={13} />
                     ₹{offNum} Offer
                   </button>
                 );

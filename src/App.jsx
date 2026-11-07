@@ -15,7 +15,7 @@ import { ReceiptPrintView } from './components/ReceiptPrintView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { COMPANY_BRANDING } from './services/db';
-import { AlertCircle, CheckCircle, Info, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 export function App() {
   const {
@@ -100,7 +100,7 @@ export function App() {
         <div className={`toast-notification ${toast.type}`}>
           {toast.type === 'success' && <CheckCircle size={18} />}
           {toast.type === 'error' && <AlertCircle size={18} />}
-          {toast.type === 'info' && <Sparkles size={18} />}
+          {toast.type === 'info' && <Info size={18} />}
           <span>{toast.message}</span>
         </div>
       )}

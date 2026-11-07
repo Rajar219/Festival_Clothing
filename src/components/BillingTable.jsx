@@ -10,7 +10,6 @@ import {
   Tag,
   Undo2,
   RotateCcw,
-  Sparkles,
   Package,
   Check,
   X,

@@ -164,17 +164,17 @@ kbd {
 }
 
 .brand-main-title {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 1.18rem;
+  font-family: 'Cinzel', 'Playfair Display', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.25rem;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 2.5px;
   color: #ffffff;
   text-transform: uppercase;
   white-space: nowrap;
   background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 65%, #d1fae5 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 .brand-subtitle-badge {
@@ -5667,40 +5667,37 @@ kbd {
 }
 
 /* ==========================================================================
-   Mobile Bottom-Sheet Docking (<= 640px)
+   Mobile Centered Floating Price Selector Modal (<= 640px)
    ========================================================================== */
 @media (max-width: 640px) {
   .price-selector-overlay {
-    padding: 0 !important;
-    align-items: flex-end !important;
+    padding: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10050 !important;
   }
 
   .modal-dialog.price-selector-modal,
   .price-selector-modal {
-    max-width: 100% !important;
-    width: 100% !important;
+    max-width: 420px !important;
+    width: calc(100% - 24px) !important;
     max-height: 85vh !important;
     max-height: 85dvh !important;
     height: auto !important;
-    border-radius: 20px 20px 0 0 !important;
-    margin: 0 !important;
-    animation: slideUpBottomSheet 0.26s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 16px !important;
+    margin: auto !important;
+    animation: fadeInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
     border: none !important;
-  }
-
-  @keyframes slideUpBottomSheet {
-    from {
-      transform: translateY(100%);
-    }
-
-    to {
-      transform: translateY(0);
-    }
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   .price-selector-header {
     padding: 10px 14px;
+    flex-shrink: 0 !important;
   }
 
   .price-selector-thumb {
@@ -5723,11 +5720,15 @@ kbd {
   .price-selector-body {
     padding: 12px 14px;
     gap: 12px;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .price-selector-footer {
     padding: 10px 14px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    flex-shrink: 0 !important;
   }
 
   .btn-modal-cancel {

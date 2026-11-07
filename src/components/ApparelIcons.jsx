@@ -239,6 +239,30 @@ export function CustomApparelIcon({ size = 24, className = '' }) {
   );
 }
 
+export function HoodieIcon({ size = 24, className = '' }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Premium hooded sweatshirt with hood and kangaroo pouch */}
+      <path d="M7 6.5C7 3.5 9 2 12 2s5 1.5 5 4.5" />
+      <path d="M5.5 8L3 11l2.5 7.5L8 18v3h8v-3l2.5.5L21 11l-2.5-3-3.5 1.5c-.8-.6-1.8-1-3-1s-2.2.4-3 1L5.5 8z" />
+      <path d="M9 16h6a1 1 0 011 1v2H8v-2a1 1 0 011-1z" />
+      <path d="M10.5 7.5v3" />
+      <path d="M13.5 7.5v3" />
+    </svg>
+  );
+}
+
 export const APPAREL_ICON_MAP = {
   Shirt: ShirtIcon,
   Pant: PantIcon,
@@ -249,5 +273,6 @@ export const APPAREL_ICON_MAP = {
   Tracks: TracksIcon,
   Shorts: ShortsIcon,
   JerseyTShirt: JerseyTShirtIcon,
+  Hoodie: HoodieIcon,
   CustomItem: CustomApparelIcon,
 };

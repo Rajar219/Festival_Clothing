@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePOS } from '../context/POSContext';
-import { Tag, Search, X, Sparkles, SlidersHorizontal, Package, Check } from 'lucide-react';
+import { Tag, Search, X, SlidersHorizontal, Package, Check } from 'lucide-react';
 import { PriceSelectorModal } from './PriceSelectorModal';
 
 const PRODUCT_IMAGE_FALLBACK = {
@@ -15,6 +15,7 @@ const PRODUCT_IMAGE_FALLBACK = {
   prod_2_shorts_combo: '/products/two_shorts_combo.jpg',
   prod_jersey_tshirt: '/products/jersey_tshirt.jpg',
   prod_3_tshirts_combo: '/products/three_tshirts_combo.jpg',
+  prod_hoodies: '/products/hoodie.jpg',
 };
 
 export function QuickProductSelector() {
@@ -192,7 +193,7 @@ export function QuickProductSelector() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                     }}
                   >
-                    <Sparkles size={10} /> Offer
+                    Offer
                   </span>
                 ) : null}
 

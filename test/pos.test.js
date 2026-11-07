@@ -587,20 +587,21 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
 
   // Test: 11 Core Menswear Products (Including Standalone Combos, Other / Custom Item Removed)
   it('Product Catalogue: Retains strictly the 11 menswear categories and removes Other / Custom Item', () => {
-    expect(INITIAL_PRODUCTS.length).toBe(11);
+    expect(INITIAL_PRODUCTS.length).toBe(12);
 
     const productNames = INITIAL_PRODUCTS.map((p) => p.name);
     expect(productNames).toContain('Shirts');
     expect(productNames).toContain('3 Shirts Combo');
     expect(productNames).toContain('Formal Pants');
     expect(productNames).toContain('Jeans');
-    expect(productNames).toContain('Half Sleeve T-Shirt');
+    expect(productNames).toContain('T-Shirt');
     expect(productNames).toContain('Full Sleeve T-Shirt');
     expect(productNames).toContain('Tracks Jersey');
     expect(productNames).toContain('Shorts Jersey');
     expect(productNames).toContain('2 Shorts Jersey Combo');
     expect(productNames).toContain('Jersey T-Shirt');
     expect(productNames).toContain('3 T-Shirts Combo');
+    expect(productNames).toContain('Hoodies');
 
     // Ensure Other / Custom Item is completely removed
     expect(productNames).not.toContain('Other / Custom Item');
@@ -614,6 +615,23 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(shirtsCombo.piecesPerUnit).toBe(3);
     expect(shirtsCombo.originalCombinedValue).toBe(1800);
     expect(shirtsCombo.comboSavingsPerUnit).toBe(800);
+
+    // Verify Hoodies configuration
+    const hoodies = INITIAL_PRODUCTS.find((p) => p.id === 'prod_hoodies');
+    expect(hoodies).toBeDefined();
+    expect(hoodies.name).toBe('Hoodies');
+    expect(hoodies.defaultPrice).toBe(600);
+    expect(hoodies.offerPrice).toBe(500);
+    expect(hoodies.maxReductionPerUnit).toBe(100);
+    expect(hoodies.reductionEnabled).toBe(true);
+    expect(hoodies.image).toBe('/products/hoodie.jpg');
+
+    // Verify T-Shirt renamed from Half Sleeve T-Shirt
+    const tshirt = INITIAL_PRODUCTS.find((p) => p.id === 'prod_tshirt_half');
+    expect(tshirt).toBeDefined();
+    expect(tshirt.name).toBe('T-Shirt');
+    expect(tshirt.defaultPrice).toBe(500);
+    expect(tshirt.offerPrice).toBe(450);
   });
 
   // Test: Offer Price Feature (Configurable without editing code)
@@ -702,21 +720,22 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
   // EXACT 17 AUTOMATED TEST SCENARIOS FOR MENSWEAR PRICING & COMBO ENGINE
   // ==========================================================================
 
-  // Scenario 1: Default product catalogue contains strictly the eleven specified categories
-  it('Requirement 1: Default product catalogue contains strictly the eleven specified categories', () => {
-    expect(INITIAL_PRODUCTS.length).toBe(11);
+  // Scenario 1: Default product catalogue contains specified menswear categories
+  it('Requirement 1: Default product catalogue contains strictly the specified categories including Hoodies and T-Shirt', () => {
+    expect(INITIAL_PRODUCTS.length).toBe(12);
     const expected = [
       { name: 'Shirts', shortcut: '1', price: 600 },
       { name: '3 Shirts Combo', shortcut: '2', price: 1000 },
       { name: 'Formal Pants', shortcut: '3', price: 650 },
       { name: 'Jeans', shortcut: '4', price: 750 },
-      { name: 'Half Sleeve T-Shirt', shortcut: '5', price: 500 },
+      { name: 'T-Shirt', shortcut: '5', price: 500 },
       { name: 'Full Sleeve T-Shirt', shortcut: '6', price: 550 },
       { name: 'Tracks Jersey', shortcut: '7', price: 450 },
       { name: 'Shorts Jersey', shortcut: '8', price: 350 },
       { name: '2 Shorts Jersey Combo', shortcut: '9', price: 600 },
       { name: 'Jersey T-Shirt', shortcut: '0', price: 420 },
       { name: '3 T-Shirts Combo', shortcut: '', price: 1200 },
+      { name: 'Hoodies', shortcut: '', price: 600 },
     ];
 
     expected.forEach((exp, idx) => {

@@ -87,7 +87,7 @@ export const INITIAL_PRODUCTS = [
   },
   {
     id: 'prod_tshirt_half',
-    name: 'Half Sleeve T-Shirt',
+    name: 'T-Shirt',
     shortcut: '5',
     defaultPrice: 500,
     offers: [450],
@@ -208,6 +208,22 @@ export const INITIAL_PRODUCTS = [
     originalCombinedValue: 1500,
     comboSavingsPerUnit: 300,
     avgPricePerPiece: 400.00,
+  },
+  {
+    id: 'prod_hoodies',
+    name: 'Hoodies',
+    shortcut: '',
+    defaultPrice: 600,
+    offers: [500],
+    offerPrice: 500,
+    allowCustomPrice: true,
+    reductionEnabled: true,
+    maxReductionPerUnit: 100,
+    isActive: true,
+    sortOrder: 12,
+    icon: 'Hoodie',
+    image: '/products/hoodie.jpg',
+    piecesPerUnit: 1,
   },
 ];
 
