@@ -3,6 +3,7 @@ import { usePOS } from '../context/POSContext';
 import { useModalBehavior } from '../hooks/useModalBehavior';
 import { formatINR, formatDateTime } from '../utils/currency';
 import { generateReceiptPDF } from '../utils/receiptGenerator';
+import { generateSalesSummaryPDF } from '../utils/salesSummaryPdfGenerator';
 import { WhatsAppModal } from './WhatsAppModal';
 import {
   exportLineItemsCSV,
@@ -43,6 +44,7 @@ import {
   User,
   Phone,
   Clock,
+  FileText,
 } from 'lucide-react';
 
 export function SalesReportsView({ defaultTab = 'history' }) {
@@ -297,6 +299,24 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       allProductSales,
     };
   }, [filteredBills, allBills, todayStart, yesterdayStart, monthStart]);
+
+  // Download Daily Sales Summary PDF Report
+  const handleDownloadSalesSummaryPDF = () => {
+    try {
+      showToast('Generating Sales Summary PDF...', 'info');
+      generateSalesSummaryPDF({
+        bills: filteredBills,
+        stats,
+        dateFilter,
+        settings,
+        autoDownload: true,
+      });
+      showToast(`Sales Summary PDF for ${dateFilter.toUpperCase()} downloaded successfully!`, 'success');
+    } catch (err) {
+      console.error('Failed to generate sales summary PDF:', err);
+      showToast('Error generating PDF report: ' + err.message, 'error');
+    }
+  };
 
   // Helper to trigger file download
   const downloadFile = (content, filename, mimeType = 'text/csv;charset=utf-8;') => {
@@ -560,6 +580,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 All Time
               </button>
             </div>
+            <button
+              type="button"
+              className="btn-download-sales-pdf"
+              onClick={handleDownloadSalesSummaryPDF}
+              title="Download Daily Sales Summary PDF Report"
+            >
+              <FileText size={15} />
+              <span>Download Sales Summary PDF</span>
+            </button>
           </div>
 
           {/* Executive Performance Milestones Cards (6-Core KPI Grid) */}
@@ -909,6 +938,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             <div className="export-button-group">
               <button
                 type="button"
+                className="btn-export-pdf"
+                onClick={handleDownloadSalesSummaryPDF}
+                title="Download Sales Summary Report in PDF format"
+              >
+                <FileText size={15} />
+                <span>Sales Summary PDF</span>
+              </button>
+              <button
+                type="button"
                 className="btn-export-csv"
                 onClick={handleExportLineItemsCSV}
               >
@@ -944,35 +982,46 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <strong className="summary-stat-amount">{formatINR(stats.totalSales, true)}</strong>
             </div>
           </div>
-          <button
-            type="button"
-            className={`mobile-sync-chip-btn ${syncState?.status || 'synced'}`}
-            onClick={triggerManualSync}
-            title="Click to synchronise sales now"
-            disabled={syncState?.status === 'syncing'}
-          >
-            {syncState?.status === 'syncing' ? (
-              <>
-                <RotateCcw size={12} className="spinning" />
-                <span>Syncing...</span>
-              </>
-            ) : (syncState?.pendingCount || 0) > 0 ? (
-              <>
-                <Cloud size={12} color="#f59e0b" />
-                <span>{syncState.pendingCount} Pending</span>
-              </>
-            ) : isFirebaseConfigured ? (
-              <>
-                <CheckCircle2 size={12} color="#10b981" />
-                <span>Live Synced</span>
-              </>
-            ) : (
-              <>
-                <Database size={12} />
-                <span>Local DB</span>
-              </>
-            )}
-          </button>
+          <div className="mobile-sales-btns-wrap">
+            <button
+              type="button"
+              className="mobile-download-pdf-chip"
+              onClick={handleDownloadSalesSummaryPDF}
+              title="Download Daily Sales Summary PDF Report"
+            >
+              <FileText size={12} />
+              <span>Summary PDF</span>
+            </button>
+            <button
+              type="button"
+              className={`mobile-sync-chip-btn ${syncState?.status || 'synced'}`}
+              onClick={triggerManualSync}
+              title="Click to synchronise sales now"
+              disabled={syncState?.status === 'syncing'}
+            >
+              {syncState?.status === 'syncing' ? (
+                <>
+                  <RotateCcw size={12} className="spinning" />
+                  <span>Syncing...</span>
+                </>
+              ) : (syncState?.pendingCount || 0) > 0 ? (
+                <>
+                  <Cloud size={12} color="#f59e0b" />
+                  <span>{syncState.pendingCount} Pending</span>
+                </>
+              ) : isFirebaseConfigured ? (
+                <>
+                  <CheckCircle2 size={12} color="#10b981" />
+                  <span>Live Synced</span>
+                </>
+              ) : (
+                <>
+                  <Database size={12} />
+                  <span>Local DB</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -1076,6 +1125,15 @@ export function SalesReportsView({ defaultTab = 'history' }) {
         </div>
 
         <div className="reports-actions">
+          <button
+            type="button"
+            className="btn-download-sales-pdf"
+            onClick={handleDownloadSalesSummaryPDF}
+            title="Download Daily Sales Summary PDF Report"
+          >
+            <FileText size={15} />
+            <span>Download Sales Summary PDF</span>
+          </button>
           <button
             type="button"
             className="btn-refresh-grid"

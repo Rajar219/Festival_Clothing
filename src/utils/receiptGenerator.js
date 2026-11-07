@@ -99,7 +99,9 @@ export function generateReceiptPDF(bill, options = {}) {
       : 'Wishing you a Happy & Prosperous Celebration!',
   };
 
-  if (mode === 'thermal') {
+  // Universal default: Every invoice and WhatsApp share renders the clean Thermal monospace receipt in A4
+  // Legacy multi-column graphic layout is only retained under mode: 'legacy_graphic'
+  if (mode !== 'legacy_graphic') {
     // =========================================================================
     // Thermal Receipt Format Scaled and Formatted in A4 Size (210mm x 297mm)
     // Clean monospace typography, dashed dividers, and ~60-70% page utilization
@@ -259,8 +261,8 @@ export function generateReceiptPDF(bill, options = {}) {
     y += 5.5;
 
     doc.setFont('courier', 'bold');
-    doc.setFontSize(12);
-    doc.text('FINAL PAYABLE:', totalsLeft, y);
+    doc.setFontSize(11);
+    doc.text('FINAL PAYABLE: (Final Payable Amount)', totalsLeft, y);
     doc.text(`Rs. ${(bill.finalPayableAmount || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
     y += 6;
     doc.line(totalsLeft - 4, y, marginRight, y);

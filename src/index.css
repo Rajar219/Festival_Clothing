@@ -2887,6 +2887,13 @@ kbd {
   color: var(--navy-800);
 }
 
+.reports-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .btn-export-csv {
   display: flex;
   align-items: center;
@@ -4258,6 +4265,27 @@ kbd {
     border: 1px solid #cbd5e1 !important;
     background: #ffffff !important;
     text-overflow: ellipsis !important;
+  }
+
+  .reports-actions {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+  }
+
+  .reports-actions .btn-download-sales-pdf {
+    flex: 1 !important;
+    min-height: 42px !important;
+    justify-content: center !important;
+    font-size: 0.8rem !important;
+  }
+
+  .reports-actions .btn-refresh-grid {
+    min-height: 42px !important;
+    min-width: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .reports-date-filter-bar {
@@ -6959,4 +6987,84 @@ kbd {
 .wa-btn-dismiss:hover {
   background: #f1f5f9;
   color: #0f172a;
+}
+
+/* ==========================================================================
+   Daily Sales Summary PDF Button & Export Styles
+   ========================================================================== */
+.btn-download-sales-pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid #047857;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-download-sales-pdf:hover {
+  background: linear-gradient(135deg, #044332 0%, #047857 100%);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-download-sales-pdf:active {
+  transform: translateY(0);
+}
+
+.btn-export-pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid #047857;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.2);
+  transition: all 0.18s ease;
+}
+
+.btn-export-pdf:hover {
+  background: linear-gradient(135deg, #044332 0%, #047857 100%);
+  transform: translateY(-1px);
+}
+
+.mobile-sales-btns-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-download-pdf-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #064e3b;
+  color: #ffffff;
+  border: 1px solid #047857;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 34px;
+  transition: all 0.15s ease;
+}
+
+.mobile-download-pdf-chip:hover {
+  background: #059669;
 }

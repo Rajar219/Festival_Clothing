@@ -1181,7 +1181,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
       },
     };
 
-    const { doc, fileName } = generateReceiptPDF(bill, { autoDownload: false, mode: 'a4' });
+    const { doc, fileName } = generateReceiptPDF(bill, { autoDownload: false, mode: 'legacy_graphic' });
     expect(fileName).toBe('FC-20261105-0042_Invoice.pdf');
 
     const pdfText = doc.internal.pages.flat().join(' ');
