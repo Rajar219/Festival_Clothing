@@ -1,4 +1,4 @@
-import { rupeesToPaise, paiseToRupees } from './currency';
+import { rupeesToPaise, paiseToRupees } from './currency.js';
 
 export const DEFAULT_COMBOS = [
   {

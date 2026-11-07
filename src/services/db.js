@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
-import { generateBillNumber, rupeesToPaise, paiseToRupees } from '../utils/currency';
-import { DEFAULT_COMBOS } from '../utils/comboEngine';
-import { getTerminalId, getTerminalType } from './terminal';
+import { generateBillNumber, rupeesToPaise, paiseToRupees } from '../utils/currency.js';
+import { DEFAULT_COMBOS } from '../utils/comboEngine.js';
+import { getTerminalId, getTerminalType } from './terminal.js';
 
 const DB_NAME = 'WisdoFestivalPOS_DB';
 const DB_VERSION = 2;

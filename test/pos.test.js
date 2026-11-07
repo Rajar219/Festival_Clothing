@@ -1218,8 +1218,8 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('Final Amount');
 
     // Check Order Summary items
-    expect(pdfText).toContain('Original Merchandise Value');
-    expect(pdfText).toContain('Individual Product Discounts');
+    expect(pdfText).toContain('Subtotal');
+    expect(pdfText).toContain('Item Reductions');
     expect(pdfText).toContain('Combo Savings');
     expect(pdfText).toContain('Total Discount');
     expect(pdfText).toContain('FINAL PAYABLE');

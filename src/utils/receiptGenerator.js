@@ -291,47 +291,62 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.line(marginLeft, y, marginRight, y);
     y += 5.5;
 
-    // Totals Section
+    // =========================================================================
+    // 5. Totals Section (Clean Two-Column Table with Exact Single Render)
+    // =========================================================================
     const totalsLeft = 112;
-    doc.setFontSize(9.5);
+    const totalsRight = marginRight;
+    const subtotal = Number(bill.subtotal !== undefined ? bill.subtotal : bill.finalPayableAmount || 0);
+    const itemReductions = Number(bill.totalReduction || bill.lineReductions || 0);
+    const comboSavings = Number(bill.comboSavings || 0);
+    const totalDiscount = itemReductions + comboSavings;
+    const finalPayable = Number(bill.finalPayableAmount !== undefined ? bill.finalPayableAmount : subtotal);
+
     doc.setFont('courier', 'normal');
+    doc.setFontSize(9.5);
 
+    // Row 1: Subtotal
     doc.text('Subtotal:', totalsLeft, y);
-    doc.text(`Rs. ${(bill.subtotal || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
-    y += 5;
+    doc.text(`Rs. ${subtotal.toFixed(2)}`, totalsRight, y, { align: 'right' });
+    y += 5.5;
 
-    if (bill.totalReduction > 0) {
+    // Row 2: Item Reductions (if reductions exist)
+    if (itemReductions > 0) {
       doc.text('Item Reductions:', totalsLeft, y);
-      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
-      y += 5;
+      doc.text(`-Rs. ${itemReductions.toFixed(2)}`, totalsRight, y, { align: 'right' });
+      y += 5.5;
     }
 
-    if (bill.comboSavings > 0) {
+    // Row 3: Combo Savings (if combo savings exist)
+    if (comboSavings > 0) {
       doc.text('Combo Savings:', totalsLeft, y);
-      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
-      y += 5;
+      doc.text(`-Rs. ${comboSavings.toFixed(2)}`, totalsRight, y, { align: 'right' });
+      y += 5.5;
     }
 
-    const totalDiscount = (bill.totalReduction || 0) + (bill.comboSavings || 0);
+    // Row 4: Total Discount (if discount exists)
     if (totalDiscount > 0) {
       doc.setFont('courier', 'bold');
       doc.text('Total Discount:', totalsLeft, y);
-      doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, marginRight, y, { align: 'right' });
+      doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, totalsRight, y, { align: 'right' });
       doc.setFont('courier', 'normal');
-      y += 5;
+      y += 5.5;
     }
 
-    y += 2;
-    doc.line(totalsLeft - 4, y, marginRight, y);
-    y += 5.5;
+    // Divider before FINAL PAYABLE
+    y += 1;
+    doc.line(totalsLeft, y, totalsRight, y);
+    y += 5;
 
-    // FIX OVERLAPPING: Display FINAL PAYABLE only once, aligned neatly on right
+    // Row 5: FINAL PAYABLE (rendered exactly once, label left, amount right)
     doc.setFont('courier', 'bold');
     doc.setFontSize(11);
     doc.text('FINAL PAYABLE:', totalsLeft, y);
-    doc.text(`Rs. ${(bill.finalPayableAmount || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
+    doc.text(`Rs. ${finalPayable.toFixed(2)}`, totalsRight, y, { align: 'right' });
     y += 6;
-    doc.line(totalsLeft - 4, y, marginRight, y);
+
+    // Divider after FINAL PAYABLE
+    doc.line(totalsLeft, y, totalsRight, y);
     y += 5.5;
 
     doc.setFontSize(9.5);
@@ -377,9 +392,16 @@ export function generateReceiptPDF(bill, options = {}) {
 
     doc.setFont('courier', 'normal');
     doc.setFontSize(8.5);
-    doc.text('"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."', pageCenter, y, { align: 'center', maxWidth: 160 });
-    y += 5.5;
+    const quoteLines = doc.splitTextToSize(
+      '"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."',
+      160
+    );
+    quoteLines.forEach((qLine) => {
+      doc.text(qLine, pageCenter, y, { align: 'center' });
+      y += 4.5;
+    });
 
+    y += 2;
     doc.setFont('courier', 'bold');
     doc.setFontSize(9.5);
     doc.text('Thank you for choosing FESTIVAL CLOTHING!', pageCenter, y, { align: 'center' });
@@ -551,24 +573,25 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.line(marginLeft, y, marginRight, y);
     y += 5;
 
-    // Totals Calculation
-    const origMerchandiseValue = (bill.items || []).reduce((acc, item) => {
-      const isCombo = Boolean(item.isCombo || item.productId?.includes('combo'));
-      const origPrice = isCombo
-        ? (item.originalCombinedValue ?? ((item.regularPricePerUnit || 600) * (item.piecesPerUnit || 3)))
-        : (item.originalUnitPrice ?? item.unitPrice);
-      return acc + (origPrice * item.qty);
-    }, 0);
-
-    const totalDiscount = (bill.totalReduction || 0) + (bill.comboSavings || 0);
-    const finalPayable = bill.finalPayableAmount ?? (origMerchandiseValue - totalDiscount);
+    // Totals Calculation (Clean Two-Column Table with Single Render)
+    const subtotal = Number(
+      bill.subtotal !== undefined
+        ? bill.subtotal
+        : (bill.items || []).reduce((acc, item) => acc + (item.unitPrice || 0) * (item.qty || 1), 0)
+    );
+    const itemReductions = Number(bill.totalReduction || bill.lineReductions || 0);
+    const comboSavings = Number(bill.comboSavings || 0);
+    const totalDiscount = itemReductions + comboSavings;
+    const finalPayable = Number(
+      bill.finalPayableAmount !== undefined ? bill.finalPayableAmount : subtotal
+    );
 
     const summaryStartY = y;
 
     // LEFT COLUMN: QR Code & Verification
     const qrSize = 30; // 30mm x 30mm
     const qrX = marginLeft + 2;
-    const qrY = summaryStartY + 1;
+    const qrY = summaryStartY + 2;
     drawBillQRCode(doc, bill, qrX, qrY, qrSize);
 
     // QR Label below code
@@ -582,59 +605,82 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.setTextColor(100, 116, 139);
     doc.text('Genuine Retail Bill Summary', qrX + (qrSize / 2), qrY + qrSize + 8, { align: 'center' });
 
-    // RIGHT COLUMN: Order Summary Table
-    const totalsLeft = 116;
-    const totalsRight = marginRight - 3;
-    let rightY = summaryStartY;
+    // RIGHT COLUMN: Order Summary Table (Calculated positions, zero overlap)
+    const totalsLeft = 114;
+    const totalsRight = marginRight - 2; // 190
+    const totalsWidth = totalsRight - totalsLeft; // 76mm
+    let rightY = summaryStartY + 2;
 
+    // 1. Subtotal
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
+    doc.text('Subtotal:', totalsLeft, rightY);
+    doc.text(`Rs. ${subtotal.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+    rightY += 6;
 
-    doc.text('Original Merchandise Value:', totalsLeft, rightY);
-    doc.text(`Rs. ${origMerchandiseValue.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
-    rightY += 5;
-
-    if (bill.totalReduction > 0) {
+    // 2. Item Reductions (if reductions exist)
+    if (itemReductions > 0) {
       doc.setTextColor(5, 150, 105);
-      doc.text('Individual Product Discounts:', totalsLeft, rightY);
-      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, totalsRight, rightY, { align: 'right' });
-      rightY += 5;
+      doc.text('Item Reductions:', totalsLeft, rightY);
+      doc.text(`-Rs. ${itemReductions.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+      rightY += 6;
     }
 
-    if (bill.comboSavings > 0) {
+    // 3. Combo Savings (if combo savings exist)
+    if (comboSavings > 0) {
       doc.setTextColor(5, 150, 105);
       doc.text('Combo Savings:', totalsLeft, rightY);
-      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, totalsRight, rightY, { align: 'right' });
-      rightY += 5;
+      doc.text(`-Rs. ${comboSavings.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+      rightY += 6;
     }
 
+    // 4. Total Discount (if discount exists)
     if (totalDiscount > 0) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(5, 150, 105);
       doc.text('Total Discount:', totalsLeft, rightY);
       doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
-      rightY += 5.5;
+      doc.setFont('helvetica', 'normal');
+      rightY += 6;
     }
 
-    // Grand Total Highlight Emerald Box - FIX OVERLAPPING: FINAL PAYABLE only once, aligned right
-    const boxW = totalsRight - totalsLeft + 6;
-    const boxX = totalsLeft - 3;
-    doc.setFillColor(240, 253, 244);
-    doc.roundedRect(boxX, rightY, boxW, 9.5, 1.5, 1.5, 'F');
-    doc.setDrawColor(5, 150, 105);
+    // 5. Clean Divider Line before FINAL PAYABLE
+    rightY += 1;
+    doc.setDrawColor(209, 250, 229);
     doc.setLineWidth(0.5);
-    doc.roundedRect(boxX, rightY, boxW, 9.5, 1.5, 1.5, 'S');
+    doc.line(totalsLeft, rightY, totalsRight, rightY);
+    rightY += 3;
+
+    // 6. FINAL PAYABLE Highlight Box (Emerald Green) - Exactly ONE render
+    const boxH = 9.5;
+    const boxY = rightY;
+    const boxX = totalsLeft - 2;
+    const boxW = totalsWidth + 4;
+
+    doc.setFillColor(240, 253, 244);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 1.5, 1.5, 'F');
+    doc.setDrawColor(5, 150, 105);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 1.5, 1.5, 'S');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
     doc.setTextColor(6, 78, 59);
-    doc.text('FINAL PAYABLE:', totalsLeft, rightY + 6.2);
-    doc.setFontSize(11.5);
-    doc.text(`Rs. ${finalPayable.toFixed(2)}`, totalsRight, rightY + 6.2, { align: 'right' });
-    rightY += 14;
+    doc.text('FINAL PAYABLE:', totalsLeft, boxY + 6.2);
 
-    // Payment Info
+    doc.setFontSize(11.5);
+    doc.text(`Rs. ${finalPayable.toFixed(2)}`, totalsRight, boxY + 6.2, { align: 'right' });
+
+    rightY = boxY + boxH + 3;
+
+    // 7. Clean Divider Line after FINAL PAYABLE
+    doc.setDrawColor(209, 250, 229);
+    doc.setLineWidth(0.5);
+    doc.line(totalsLeft, rightY, totalsRight, rightY);
+    rightY += 5;
+
+    // 8. Payment Details
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
@@ -651,9 +697,9 @@ export function generateReceiptPDF(bill, options = {}) {
       rightY += 5;
     }
 
-    // Natural vertical spacing to reach ~60-70% page height
-    y = Math.max(rightY, qrY + qrSize + 12);
-    const bannerY = Math.max(y + 8, 168);
+    // Natural vertical spacing to reach ~60-70% page height without collision
+    y = Math.max(rightY + 4, qrY + qrSize + 14);
+    const bannerY = Math.max(y + 6, 168);
     const bannerH = 26;
 
     // Attractive Diwali Festive Greeting Card with elegant gold accents
