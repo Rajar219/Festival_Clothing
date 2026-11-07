@@ -83,7 +83,7 @@ export function generateWhatsAppLink(cleanMobile, text) {
  * @param {object|string} options - Configuration options or mode string ('thermal' | 'a4')
  */
 export function generateReceiptPDF(bill, options = {}) {
-  const mode = typeof options === 'string' ? options : (options.mode || 'a4');
+  const mode = typeof options === 'string' ? options : (options.mode || 'thermal');
   const autoDownload = typeof options === 'object' && options.autoDownload !== undefined ? options.autoDownload : true;
 
   // Exact shop address: No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.
