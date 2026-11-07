@@ -3012,6 +3012,56 @@ kbd {
   height: 44px;
 }
 
+/* Sticky Left Columns for Smooth Horizontal Swiping on Mobile & Desktop */
+.ledger-table th:first-child,
+.ledger-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+
+.ledger-table thead th:first-child {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.ledger-table tfoot td:first-child {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.ledger-table th:nth-child(2),
+.ledger-table td:nth-child(2) {
+  position: sticky;
+  left: 48px;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: 3px 0 5px -2px rgba(0, 0, 0, 0.1);
+}
+
+.ledger-table thead th:nth-child(2) {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.ledger-row:hover td:first-child,
+.ledger-row:hover td:nth-child(2) {
+  background: #f1f5f9;
+}
+
+.ledger-row.row-cancelled td:first-child,
+.ledger-row.row-cancelled td:nth-child(2) {
+  background: #fef2f2;
+}
+
+.mobile-table-swipe-hint {
+  display: none;
+}
+
 .bill-number-text {
   font-family: var(--font-mono);
   color: var(--navy-900);
@@ -3884,19 +3934,66 @@ kbd {
     min-height: 46px;
   }
 
-  /* Sales Reports Mobile Stacked Cards */
-  .desktop-ledger-view {
+  /* Mobile Sales Ledger: Real Compact Horizontally Scrollable Table */
+  .desktop-ledger-view,
+  .ledger-scroll-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+    border-radius: 8px;
+  }
+
+  .mobile-ledger-cards {
     display: none !important;
   }
 
-  /* Mobile Sales Ledger: Redesigned 5-Row Bill Card */
-  .mobile-ledger-cards {
+  .mobile-table-swipe-hint {
     display: flex !important;
-    flex-direction: column !important;
-    gap: 12px !important;
-    padding: 0 !important;
+    align-items: center;
+    justify-content: center;
+    background: #f0fdf4 !important;
+    border-bottom: 1px solid #dcfce7 !important;
+    color: #166534 !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 6px 10px !important;
+    letter-spacing: 0.2px !important;
+    text-align: center !important;
+  }
+
+  .ledger-table {
+    min-width: 780px !important;
     width: 100% !important;
-    box-sizing: border-box !important;
+  }
+
+  .ledger-table th {
+    padding: 7px 8px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .ledger-table td {
+    padding: 6px 8px !important;
+    font-size: 0.76rem !important;
+    height: 38px !important;
+  }
+
+  .bill-number-text {
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+  }
+
+  .final-amount-text {
+    font-size: 0.84rem !important;
+    font-weight: 800 !important;
+    color: #064e3b !important;
+  }
+
+  .btn-icon-action {
+    width: 26px !important;
+    height: 26px !important;
   }
 
   /* ==========================================================================

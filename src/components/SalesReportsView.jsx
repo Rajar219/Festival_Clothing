@@ -1192,29 +1192,33 @@ export function SalesReportsView({ defaultTab = 'history' }) {
       </div>
 
       {/* Ledger Cards & Table Container */}
+      {/* Ledger Cards & Table Container */}
       <div className="ledger-card">
-        {/* Desktop View: Wide Ledger Table (>= 768px) */}
-        <div className="ledger-scroll-container desktop-ledger-view">
+        {/* Mobile Horizontal Swipe Hint Badge */}
+        <div className="mobile-table-swipe-hint mobile-only">
+          <span>← Swipe table horizontally to view all columns & actions →</span>
+        </div>
+
+        {/* Unified Table View: Horizontally Scrollable on Mobile, Full-Width on Desktop */}
+        <div className="ledger-scroll-container">
           <table className="ledger-table">
             <thead>
               <tr>
                 <th className="text-center" style={{ width: '48px' }}>S.NO</th>
-                <th>BILL NUMBER</th>
-                <th>DATE & TIME</th>
-                <th>CASHIER</th>
-                <th>ITEMS SUMMARY</th>
-                <th className="text-right">SUBTOTAL</th>
-                <th className="text-center">REDUCTION</th>
-                <th className="text-right">FINAL AMOUNT</th>
-                <th className="text-center">PAYMENT</th>
-                <th className="text-center">STATUS</th>
+                <th style={{ minWidth: '150px' }}>BILL NUMBER</th>
+                <th style={{ minWidth: '135px' }}>DATE & TIME</th>
+                <th style={{ minWidth: '90px' }}>CASHIER</th>
+                <th style={{ minWidth: '175px' }}>ITEMS SUMMARY</th>
+                <th className="text-right" style={{ minWidth: '110px' }}>FINAL AMOUNT</th>
+                <th className="text-center" style={{ minWidth: '90px' }}>PAYMENT</th>
+                <th className="text-center" style={{ minWidth: '100px' }}>STATUS</th>
                 <th className="text-center" style={{ minWidth: '175px', whiteSpace: 'nowrap' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredBills.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center empty-ledger-cell">
+                  <td colSpan={9} className="text-center empty-ledger-cell">
                     <AlertTriangle size={32} className="empty-alert-icon" />
                     <p>No bills found for the selected filter criteria.</p>
                     <button
@@ -1236,7 +1240,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               ) : (
                 filteredBills.map((bill, index) => {
                   const isCancelled = bill.status === 'cancelled';
-                  const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
 
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
@@ -1256,18 +1259,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                         <span className="items-summary-text">
                           {(bill.items || []).map((i) => `${i.name} (×${i.qty})`).join(', ')}
                         </span>
-                      </td>
-                      <td className="text-right">
-                        <span>{formatINR(bill.subtotal || bill.finalPayableAmount, false)}</span>
-                      </td>
-                      <td className="text-center">
-                        {totalSavings > 0 ? (
-                          <span className="reduction-badge">
-                            -₹{totalSavings}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
                       </td>
                       <td className="text-right">
                         <strong className={`final-amount-text ${isCancelled ? 'struck' : ''}`}>
@@ -1349,7 +1340,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             {filteredBills.length > 0 && (
               <tfoot>
                 <tr className="ledger-table-grand-total-row">
-                  <td colSpan={7} className="text-right ledger-tfoot-label">
+                  <td colSpan={5} className="text-right ledger-tfoot-label">
                     Grand Total ({stats.validCount} {stats.validCount === 1 ? 'Bill' : 'Bills'}):
                   </td>
                   <td className="text-right font-mono ledger-tfoot-amount">
@@ -1360,197 +1351,6 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               </tfoot>
             )}
           </table>
-        </div>
-
-        {/* Mobile View: Stacked Responsive Bill Cards (< 768px) */}
-        <div className="mobile-ledger-cards">
-          {filteredBills.length === 0 ? (
-            <div className="mobile-empty-ledger">
-              <AlertTriangle size={32} className="empty-alert-icon" />
-              <p>No bills found for the selected filter criteria.</p>
-              <button
-                type="button"
-                className="btn-reset-filters"
-                onClick={() => {
-                  setSearchTerm('');
-                  setDateFilter('all');
-                  setTerminalFilter('all');
-                  setPaymentFilter('all');
-                  setStatusFilter('all');
-                }}
-              >
-                <RotateCcw size={13} />
-                <span>Reset Filters</span>
-              </button>
-            </div>
-          ) : (
-            filteredBills.map((bill, index) => {
-              const isCancelled = bill.status === 'cancelled';
-              const isMobileTerminal = (bill.terminalType || '').toUpperCase() === 'MOBILE';
-              const totalSavings = (bill.totalReduction || 0) + (bill.comboSavings || 0);
-
-              const origAmount = bill.subtotal || (Number(bill.finalPayableAmount) + totalSavings);
-
-              return (
-                <div key={bill.id} className={`mobile-table-card ${isCancelled ? 'card-cancelled' : ''}`}>
-                  {/* Card Header: Prominent Bill Number + Terminal & Status Badges */}
-                  <div className="mobile-table-card-header">
-                    <div className="mobile-table-bill-id">
-                      <span className="mobile-table-sno">#{filteredBills.length - index}</span>
-                      <strong className="mobile-table-bill-num">{bill.billNumber}</strong>
-                    </div>
-                    <div className="mobile-table-header-badges">
-                      <span className={`terminal-badge-mini ${isMobileTerminal ? 'mobile' : 'pc'}`}>
-                        {isMobileTerminal ? <Smartphone size={10} /> : <Laptop size={10} />}
-                        <span>{isMobileTerminal ? 'MOBILE' : 'PC'}</span>
-                      </span>
-                      {isCancelled ? (
-                        <span className="status-badge-mini cancelled">VOIDED</span>
-                      ) : (
-                        <span className="status-badge-mini paid">PAID</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Line-by-Line Structured Table */}
-                  <div className="mobile-table-rows">
-                    {/* Row 1: Date */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Date</span>
-                      <span className="mobile-table-value">{formatDateTime(bill.createdAt)}</span>
-                    </div>
-
-                    {/* Row 2: Cashier */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Cashier</span>
-                      <span className="mobile-table-value">{bill.cashierName || 'Cashier 1'}</span>
-                    </div>
-
-                    {/* Customer Info (if present) */}
-                    {(bill.customerName || bill.customerPhone) && (
-                      <div className="mobile-table-row">
-                        <span className="mobile-table-label">Customer</span>
-                        <span className="mobile-table-value">
-                          {bill.customerName || 'Customer'} {bill.customerPhone ? `(${bill.customerPhone})` : ''}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Row 3: Products */}
-                    <div className="mobile-table-row products-row">
-                      <span className="mobile-table-label">Products</span>
-                      <span className="mobile-table-value products-list">
-                        {(bill.items || []).map((i) => `${i.name} × ${i.qty}`).join(', ') || 'No items'}
-                      </span>
-                    </div>
-
-                    {/* Row 4: Original Amount */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Original Amount</span>
-                      <span className="mobile-table-value">{formatINR(origAmount, true)}</span>
-                    </div>
-
-                    {/* Row 5: Discount */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Discount</span>
-                      <span className={`mobile-table-value ${totalSavings > 0 ? 'text-discount' : ''}`}>
-                        {totalSavings > 0 ? `₹${totalSavings.toFixed(2)}` : '₹0.00'}
-                      </span>
-                    </div>
-
-                    {/* Row 6: Final Amount (Bold Emerald Green Highlight) */}
-                    <div className="mobile-table-row final-amount-row">
-                      <span className="mobile-table-label">Final Amount</span>
-                      <span className={`mobile-table-value final-amount-val ${isCancelled ? 'struck' : ''}`}>
-                        {formatINR(bill.finalPayableAmount, true)}
-                      </span>
-                    </div>
-
-                    {/* Row 7: Payment */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Payment</span>
-                      <span className={`mobile-table-value payment-badge ${(bill.paymentMethod || 'cash').toLowerCase()}`}>
-                        {(bill.paymentMethod || 'cash').toUpperCase()}
-                      </span>
-                    </div>
-
-                    {/* Row 8: Sync Status */}
-                    <div className="mobile-table-row">
-                      <span className="mobile-table-label">Sync Status</span>
-                      <span className="mobile-table-value sync-status-val">
-                        <span className="sync-dot-mini synced" />
-                        <span>Synced</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions Row 1: Details | WhatsApp | PDF | Print */}
-                  <div className="mobile-table-actions-primary">
-                    <button
-                      type="button"
-                      className="mobile-tbl-btn details"
-                      onClick={() => setSelectedBill(bill)}
-                      title="View bill details"
-                    >
-                      <Eye size={13} />
-                      <span>Details</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="mobile-tbl-btn whatsapp"
-                      onClick={() => setWhatsAppBill(bill)}
-                      title="Share on WhatsApp"
-                    >
-                      <Send size={13} />
-                      <span>WhatsApp</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="mobile-tbl-btn pdf"
-                      onClick={() => handleDownloadBillPDF(bill)}
-                      title="Download PDF"
-                    >
-                      <Download size={13} />
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="mobile-tbl-btn print"
-                      onClick={() => triggerPrint(bill, 'thermal')}
-                      title="Reprint receipt"
-                    >
-                      <Printer size={13} />
-                      <span>Print</span>
-                    </button>
-                  </div>
-
-                  {/* Actions Row 2: Void Bill | Delete */}
-                  <div className="mobile-table-actions-secondary">
-                    {!isCancelled && (
-                      <button
-                        type="button"
-                        className="mobile-tbl-btn-secondary void"
-                        onClick={() => handleAttemptCancel(bill)}
-                        title="Void this bill"
-                      >
-                        <Ban size={11} />
-                        <span>Void Bill</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="mobile-tbl-btn-secondary delete"
-                      onClick={() => handleAttemptDelete(bill)}
-                      title="Delete bill permanently"
-                    >
-                      <Trash2 size={11} />
-                      <span>Delete</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
         </div>
       </div>
 

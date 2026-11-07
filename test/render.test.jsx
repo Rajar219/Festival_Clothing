@@ -341,20 +341,37 @@ describe('App Render & Responsive Design Test', () => {
     expect(reportsHtml).toContain('Reports &amp; Analytics');
   });
 
-  it('verifies Mobile Sales History line-by-line table CSS classes exist for 360px-430px screens', () => {
+  it('verifies Mobile Sales History unified compact table architecture without subtotal/reduction columns', () => {
+    const historyHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="history" />
+      </POSProvider>
+    );
+
+    // Verify unified table headers
+    expect(historyHtml).toContain('ledger-scroll-container');
+    expect(historyHtml).toContain('ledger-table');
+    expect(historyHtml).toContain('mobile-table-swipe-hint');
+    expect(historyHtml.toUpperCase()).toContain('S.NO');
+    expect(historyHtml.toUpperCase()).toContain('BILL NUMBER');
+    expect(historyHtml.toUpperCase()).toContain('DATE &AMP; TIME');
+    expect(historyHtml.toUpperCase()).toContain('CASHIER');
+    expect(historyHtml.toUpperCase()).toContain('ITEMS SUMMARY');
+    expect(historyHtml.toUpperCase()).toContain('FINAL AMOUNT');
+    expect(historyHtml.toUpperCase()).toContain('PAYMENT');
+    expect(historyHtml.toUpperCase()).toContain('STATUS');
+    expect(historyHtml.toUpperCase()).toContain('ACTIONS');
+
+    // Verify subtotal and reduction columns are removed from table headers
+    expect(historyHtml).not.toContain('>SUBTOTAL<');
+    expect(historyHtml).not.toContain('>REDUCTION<');
+
+    // Verify CSS styles for sticky columns and mobile horizontal scroll
     const cssPath = path.resolve(__dirname, '../src/index.css');
     const cssContent = fs.readFileSync(cssPath, 'utf-8');
-
-    expect(cssContent).toContain('.mobile-table-card');
-    expect(cssContent).toContain('.mobile-table-card-header');
-    expect(cssContent).toContain('.mobile-table-rows');
-    expect(cssContent).toContain('.mobile-table-row');
-    expect(cssContent).toContain('.mobile-table-label');
-    expect(cssContent).toContain('.mobile-table-value');
-    expect(cssContent).toContain('.final-amount-row');
-    expect(cssContent).toContain('.final-amount-val');
-    expect(cssContent).toContain('.mobile-table-actions-primary');
-    expect(cssContent).toContain('.mobile-table-actions-secondary');
+    expect(cssContent).toContain('.ledger-scroll-container');
+    expect(cssContent).toContain('.mobile-table-swipe-hint');
+    expect(cssContent).toContain('position: sticky');
   });
 
   it('verifies Grand Total chip renders in Sales History with bold styling', () => {
