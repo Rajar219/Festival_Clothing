@@ -356,4 +356,24 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('.mobile-table-actions-primary');
     expect(cssContent).toContain('.mobile-table-actions-secondary');
   });
+
+  it('verifies Grand Total chip renders in Sales History with bold styling', () => {
+    const historyHtml = renderToString(
+      <POSProvider>
+        <SalesReportsView defaultTab="history" />
+      </POSProvider>
+    );
+
+    // Verify Grand Total chip renders in sales history view
+    expect(historyHtml).toContain('sales-history-grand-total-chip');
+    expect(historyHtml).toContain('Grand Total:');
+    expect(historyHtml).toContain('grand-total-amount');
+
+    // Verify CSS styles
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+    expect(cssContent).toContain('.sales-history-grand-total-chip');
+    expect(cssContent).toContain('.grand-total-amount');
+    expect(cssContent).toContain('font-weight: 800');
+  });
 });

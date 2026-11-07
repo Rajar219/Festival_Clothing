@@ -449,24 +449,35 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     <div className="sales-reports-container">
       {/* Sub-view Navigation Bar (Parity Switcher for Desktop & Mobile) */}
       <div className="subview-tab-bar">
-        <button
-          type="button"
-          id="btn-subtab-history"
-          className={`subview-tab-btn ${activeViewMode === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveViewMode('history')}
-        >
-          <History size={16} />
-          <span>Sales History ({filteredBills.length})</span>
-        </button>
-        <button
-          type="button"
-          id="btn-subtab-reports"
-          className={`subview-tab-btn ${activeViewMode === 'reports' ? 'active' : ''}`}
-          onClick={() => setActiveViewMode('reports')}
-        >
-          <BarChart3 size={16} />
-          <span>Reports & Analytics</span>
-        </button>
+        <div className="subview-tab-buttons">
+          <button
+            type="button"
+            id="btn-subtab-history"
+            className={`subview-tab-btn ${activeViewMode === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveViewMode('history')}
+          >
+            <History size={16} />
+            <span>Sales History ({filteredBills.length})</span>
+          </button>
+          <button
+            type="button"
+            id="btn-subtab-reports"
+            className={`subview-tab-btn ${activeViewMode === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveViewMode('reports')}
+          >
+            <BarChart3 size={16} />
+            <span>Reports & Analytics</span>
+          </button>
+        </div>
+
+        {/* Prominent Grand Total Badge on the Top Left Corner Free Space */}
+        {activeViewMode === 'history' && (
+          <div className="sales-history-grand-total-chip" id="sales-history-grand-total" title="Grand Total of completed bills for the selected filter period">
+            <span className="grand-total-label">Grand Total:</span>
+            <span className="grand-total-amount">{formatINR(stats.totalSales, true)}</span>
+            <span className="grand-total-count">({stats.validCount} {stats.validCount === 1 ? 'Bill' : 'Bills'})</span>
+          </div>
+        )}
       </div>
 
       {/* Cloud Synchronisation & Local-First Cache Status Banner */}
@@ -990,7 +1001,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
               <span className="mobile-sales-count-pill">{filteredBills.length} {filteredBills.length === 1 ? 'Bill' : 'Bills'}</span>
             </div>
             <div className="mobile-sales-stats-row">
-              <span className="summary-stat-label">Period Sales:</span>
+              <span className="summary-stat-label">Grand Total:</span>
               <strong className="summary-stat-amount">{formatINR(stats.totalSales, true)}</strong>
             </div>
           </div>
@@ -1324,6 +1335,19 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                 })
               )}
             </tbody>
+            {filteredBills.length > 0 && (
+              <tfoot>
+                <tr className="ledger-table-grand-total-row">
+                  <td colSpan={7} className="text-right ledger-tfoot-label">
+                    Grand Total ({stats.validCount} {stats.validCount === 1 ? 'Bill' : 'Bills'}):
+                  </td>
+                  <td className="text-right font-mono ledger-tfoot-amount">
+                    {formatINR(stats.totalSales, true)}
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 

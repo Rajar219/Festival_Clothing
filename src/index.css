@@ -1501,8 +1501,75 @@ kbd {
 .subview-tab-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.subview-tab-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sales-history-grand-total-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1.5px solid #10b981;
+  border-radius: 8px;
+  padding: 5px 14px;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12);
+  margin-left: 4px;
+}
+
+.sales-history-grand-total-chip .grand-total-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #064e3b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sales-history-grand-total-chip .grand-total-amount {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #064e3b;
+  font-family: var(--font-mono, monospace);
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+
+.sales-history-grand-total-chip .grand-total-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #047857;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.ledger-table-grand-total-row {
+  background: #f8fafc;
+  border-top: 2px solid #cbd5e1;
+}
+
+.ledger-tfoot-label {
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ledger-tfoot-amount {
+  padding: 12px 16px;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #064e3b;
 }
 
 .subview-tab-btn {
@@ -4208,6 +4275,21 @@ kbd {
 
   .btn-reset-filters:active {
     background: #ecfdf5;
+  }
+
+  .subview-tab-buttons {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .subview-tab-buttons .subview-tab-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .sales-history-grand-total-chip {
+    display: none !important;
   }
 
   .mobile-sales-summary-bar {
