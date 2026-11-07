@@ -36,11 +36,6 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
   // Cached generated PDF references to avoid redundant generation
   const cachedPdfRef = useRef(null);
 
-  // Detect mobile device
-  const isMobile = typeof window !== 'undefined' &&
-    (window.innerWidth <= 768 ||
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-
   useEffect(() => {
     if (bill?.customerPhone) {
       setMobileNumber(bill.customerPhone);
@@ -61,7 +56,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
       }
     }
 
-    // Check if device supports native file sharing
+    // Check if device/browser supports native file sharing (Web Share API level 2)
     try {
       if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
         const testFile = new File(['test'], 'invoice.pdf', { type: 'application/pdf' });
@@ -97,7 +92,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
   };
 
-  // Helper to trigger client download of the PDF
+  // Helper to trigger explicit manual client download of the PDF
   const triggerPdfDownload = (pdfResult) => {
     if (!pdfResult?.blob) return;
     try {
@@ -114,7 +109,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
   };
 
-  // 1. MOBILE NATIVE SHARING: Web Share API with PDF file + greeting text
+  // 1. DIRECT NATIVE SHARING: Web Share API with PDF file + greeting text directly (NO SAVE AS DIALOG)
   const handleNativeFileShare = async () => {
     setIsProcessing(true);
     setErrorMsg('');
@@ -157,22 +152,22 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
           if (onSharingIncomplete) onSharingIncomplete();
           showToast('Sharing cancelled. Bill remains safely saved.', 'info');
         } else {
-          console.warn('Native share failed, using direct chat fallback:', err);
-          showToast('Native share failed. Opening direct WhatsApp chat...', 'warning');
+          console.warn('Native share failed, falling back to direct chat:', err);
+          showToast('Opening direct WhatsApp chat...', 'info');
           handleDirectCustomerChat(true);
         }
       } finally {
         setIsProcessing(false);
       }
     } else {
-      // Fallback: download PDF and open direct chat
-      showToast('File sharing unsupported on this browser. Using direct WhatsApp chat...', 'info');
+      // Fallback to direct WhatsApp chat without download
+      showToast('Opening direct WhatsApp chat...', 'info');
       handleDirectCustomerChat(true);
       setIsProcessing(false);
     }
   };
 
-  // 2. DIRECT CHAT (Desktop WhatsApp Web or Mobile Fallback)
+  // 2. DIRECT CHAT: wa.me click-to-chat without forcing download
   const handleDirectCustomerChat = async (isFallback = false) => {
     const validation = validateIndianMobile(mobileNumber);
     if (!validation.isValid) {
@@ -183,17 +178,11 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     setErrorMsg('');
     setIsProcessing(true);
 
-    // Generate and download PDF once so user has it ready in Downloads/Files
-    const pdfResult = ensurePdf();
-    if (pdfResult) {
-      triggerPdfDownload(pdfResult);
-    }
-
-    // Prefill greeting message
+    // Prefill greeting message directly
     const message = generateWhatsAppDirectChatText(bill);
     const waUrl = `https://wa.me/91${validation.cleanNumber}?text=${encodeURIComponent(message)}`;
 
-    // Open exact WhatsApp chat
+    // Open exact customer WhatsApp chat directly (NO auto-download popup!)
     window.open(waUrl, '_blank', 'noopener,noreferrer');
 
     if (updateBillRecordStatus) {
@@ -204,11 +193,11 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     }
 
     setSharingStatus('chat_opened');
-    showToast(`WhatsApp chat opened for +91 ${validation.cleanNumber}. Attach PDF and press Send.`, 'success');
+    showToast(`WhatsApp chat opened for +91 ${validation.cleanNumber}.`, 'success');
     setIsProcessing(false);
   };
 
-  // 3. MANUAL PDF DOWNLOAD
+  // 3. MANUAL PDF DOWNLOAD: Only triggers when user explicitly taps "Download PDF"
   const handleDownloadPDF = () => {
     const pdfResult = ensurePdf();
     if (pdfResult) {
@@ -233,7 +222,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
             </div>
             <div>
               <h2 className="wa-modal-title">Share WhatsApp Invoice</h2>
-              <span className="wa-modal-subtitle">Official A4 PDF bill & customer greeting</span>
+              <span className="wa-modal-subtitle">Direct PDF invoice & customer greeting</span>
             </div>
           </div>
           <button
@@ -307,7 +296,6 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
                   setMobileNumber(val);
                   if (errorMsg) setErrorMsg('');
                 }}
-                autoFocus={!isMobile}
               />
               {isNumberValid && (
                 <span className="wa-input-valid-indicator" title="Valid 10-digit Indian Mobile Number">
@@ -331,19 +319,19 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
             <div className="wa-guidance-content">
               {sharingStatus === 'chat_opened' ? (
                 <p>
-                  <strong>WhatsApp chat opened!</strong> The A4 invoice PDF has been downloaded to your device. Simply attach it using the paperclip (📎) and press Send.
+                  <strong>WhatsApp chat opened!</strong> Customer greeting prefilled. Use the <strong>Download PDF</strong> button below if you also want to save a file copy on this PC.
                 </p>
               ) : sharingStatus === 'shared_native' ? (
                 <p>
-                  <strong>Share sheet opened!</strong> Select WhatsApp and choose your customer contact to send both the PDF invoice and greeting.
+                  <strong>Direct share opened!</strong> Select WhatsApp to send both the PDF invoice and greeting directly to the customer.
                 </p>
-              ) : isMobile && canNativeShare ? (
+              ) : canNativeShare ? (
                 <p>
-                  Tapping <strong>Share on WhatsApp</strong> opens your phone's native share sheet with both the <strong>A4 PDF invoice</strong> and customer greeting attached together.
+                  Click <strong>Share PDF Directly</strong> to send the invoice and greeting directly to WhatsApp without downloading to your computer.
                 </p>
               ) : (
                 <p>
-                  Tapping <strong>Open WhatsApp Chat</strong> downloads the invoice PDF and opens the customer's direct chat with the greeting prefilled. Attach the PDF and tap Send.
+                  Click <strong>Open Customer WhatsApp Chat</strong> to launch the customer's chat directly with greeting prefilled.
                 </p>
               )}
             </div>
@@ -352,7 +340,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
           {/* Action Buttons */}
           <div className="wa-actions-wrapper">
             {/* Primary Action Button */}
-            {isMobile && canNativeShare ? (
+            {canNativeShare ? (
               <button
                 type="button"
                 className="wa-btn-main wa-btn-share-native"
@@ -360,7 +348,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
                 disabled={isProcessing}
               >
                 <Share2 size={18} />
-                <span>{isProcessing ? 'Preparing Invoice...' : 'SHARE PDF + GREETING (WHATSAPP)'}</span>
+                <span>{isProcessing ? 'Preparing Invoice...' : 'SHARE PDF + GREETING (DIRECTLY)'}</span>
               </button>
             ) : (
               <button
@@ -374,24 +362,22 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
               </button>
             )}
 
-            {/* Secondary Action Row */}
+            {/* Secondary Action Row: Always offers Direct Chat + Download PDF */}
             <div className="wa-secondary-actions-bar">
-              {isMobile && canNativeShare && (
-                <button
-                  type="button"
-                  className="wa-btn-sub"
-                  onClick={() => handleDirectCustomerChat(false)}
-                  title="Open direct WhatsApp chat using phone number"
-                >
-                  <Send size={14} />
-                  <span>Direct Chat</span>
-                </button>
-              )}
+              <button
+                type="button"
+                className="wa-btn-sub"
+                onClick={() => handleDirectCustomerChat(false)}
+                title="Open direct WhatsApp chat without downloading"
+              >
+                <Send size={14} />
+                <span>Open Direct Chat</span>
+              </button>
               <button
                 type="button"
                 className="wa-btn-sub"
                 onClick={handleDownloadPDF}
-                title="Download A4 invoice PDF directly"
+                title="Download A4 invoice PDF copy to your device"
               >
                 <Download size={14} />
                 <span>Download PDF</span>
