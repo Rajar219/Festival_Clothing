@@ -1138,7 +1138,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   return (
                     <tr key={bill.id} className={`ledger-row ${isCancelled ? 'row-cancelled' : ''}`}>
                       <td className="text-center">
-                        <span className="serial-number-badge">{index + 1}</span>
+                        <span className="serial-number-badge">{filteredBills.length - index}</span>
                       </td>
                       <td>
                         <strong className="bill-number-text">{bill.billNumber}</strong>
@@ -1278,7 +1278,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
                   {/* ROW 1: Top row: Bill number | PC/Mobile | Payment status */}
                   <div className="mobile-bill-top-row">
                     <div className="mobile-bill-id-box">
-                      <span className="mobile-bill-sno-badge">#{index + 1}</span>
+                      <span className="mobile-bill-sno-badge">#{filteredBills.length - index}</span>
                       <strong className="mobile-bill-num">{bill.billNumber}</strong>
                     </div>
                     <div className="mobile-bill-status-box">

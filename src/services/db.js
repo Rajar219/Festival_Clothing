@@ -850,7 +850,7 @@ export function exportBillsSummaryCSV(bills, shopName = 'FESTIVAL CLOTHING') {
     const totalQty = (b.items || []).reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
 
     return [
-      idx + 1,
+      bills.length - idx,
       escapeCSV(b.id),
       escapeCSV(b.billNumber),
       escapeCSV(b.createdAt),
