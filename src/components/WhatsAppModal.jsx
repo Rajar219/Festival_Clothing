@@ -45,10 +45,10 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     setErrorMsg('');
     setSharingStatus('idle');
 
-    // Pre-generate A4 PDF once for this bill
+    // Pre-generate Thermal A4 PDF once for this bill
     if (bill) {
       try {
-        const result = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
+        const result = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
         cachedPdfRef.current = result;
         setIsPdfReady(true);
       } catch (err) {
@@ -82,7 +82,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
       return cachedPdfRef.current;
     }
     try {
-      const res = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
+      const res = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
       cachedPdfRef.current = res;
       setIsPdfReady(true);
       return res;
@@ -270,7 +270,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
               </span>
               <span className={`wa-pill-verified ${isPdfReady ? 'ready' : ''}`}>
                 <FileText size={11} />
-                {isPdfReady ? 'A4 PDF Ready' : 'Generating PDF...'}
+                {isPdfReady ? 'Thermal A4 PDF Ready' : 'Generating PDF...'}
               </span>
             </div>
           </div>
