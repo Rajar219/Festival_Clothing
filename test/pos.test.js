@@ -1064,7 +1064,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     const pdfText = doc.internal.pages.flat().join(' ');
     expect(pdfText).toContain('Shirts');
     expect(pdfText).toContain('Combo Savings');
-    expect(pdfText).toContain('Final Payable Amount');
+    expect(pdfText).toContain('FINAL PAYABLE');
   });
 
   // Scenario 16: Administrator edits product base price, offer price, and combo settings
@@ -1222,13 +1222,11 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     expect(pdfText).toContain('Individual Product Discounts');
     expect(pdfText).toContain('Combo Savings');
     expect(pdfText).toContain('Total Discount');
-    expect(pdfText).toContain('Final Payable Amount');
+    expect(pdfText).toContain('FINAL PAYABLE');
 
-    // Check Redesigned Footer messages
-    expect(pdfText).toContain('THANK YOU FOR SHOPPING WITH US!');
-    expect(pdfText).toContain('We truly appreciate your support.');
+    // Check Customer Notice and Branding
     expect(pdfText).toContain('FESTIVAL CLOTHING');
-    expect(pdfText).toContain('MENSWEAR');
+    expect(pdfText).not.toContain('MENSWEAR');
     expect(pdfText).not.toContain('WISDO TECH');
     expect(pdfText).not.toContain('Goods once sold can be exchanged');
   });
@@ -1321,7 +1319,7 @@ describe('WISDO TECH Retail POS Engine - Festival Clothing Requirements', () => 
     const pdfText = doc.internal.pages.flat().join(' ');
     // Header & Meta
     expect(pdfText).toContain('FESTIVAL CLOTHING');
-    expect(pdfText).toContain('MENSWEAR');
+    expect(pdfText).not.toContain('MENSWEAR');
     expect(pdfText).toContain('RETAIL INVOICE / SALES RECEIPT');
     expect(pdfText).toContain('Bill No: FC-20261106-0001');
 

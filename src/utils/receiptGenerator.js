@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
-import { formatINR, formatDateTime } from './currency';
-import { getBillFestiveQuote } from '../services/db';
+import QRCode from 'qrcode';
+import { formatINR, formatDateTime } from './currency.js';
+import { getBillFestiveQuote } from '../services/db.js';
 
 /**
  * Validates and cleans Indian mobile numbers
@@ -76,35 +77,78 @@ export function generateWhatsAppLink(cleanMobile, text) {
 }
 
 /**
- * Generates and downloads a PDF invoice using actual saved bill data
- * Re-architected using the clean thermal receipt layout adapted to A4 portrait
- * Occupies balanced 60–70% of usable page height with zero GST
+ * Generates a high-resolution vector QR code directly onto jsPDF
+ * Encodes bill number, date, items, final payable amount and payment method.
+ * Excludes customer phone number or other personal data.
+ */
+function drawBillQRCode(doc, bill, x, y, sizeMm) {
+  const itemsSummary = (bill.items || [])
+    .map((it) => `• ${it.name} x ${it.qty}`)
+    .join('\n');
+  const dateStr = formatDateTime(bill.createdAt);
+  const payMethod = (bill.paymentMethod || 'cash').toUpperCase();
+  const finalAmt = (Number(bill.finalPayableAmount) || 0).toFixed(2);
+
+  const qrText = [
+    'FESTIVAL CLOTHING',
+    `Invoice: ${bill.billNumber}`,
+    `Date: ${dateStr}`,
+    'Items:',
+    itemsSummary,
+    `Payment: ${payMethod}`,
+    `Final Total: Rs. ${finalAmt}`,
+  ].join('\n');
+
+  try {
+    const qr = QRCode.create(qrText, { errorCorrectionLevel: 'M' });
+    const moduleCount = qr.modules.size;
+    const moduleSize = sizeMm / moduleCount;
+
+    // White quiet-zone backing
+    doc.setFillColor(255, 255, 255);
+    doc.rect(x - 1, y - 1, sizeMm + 2, sizeMm + 2, 'F');
+
+    // Draw QR modules in pure solid black for 100% reliable scanner optical recognition
+    doc.setFillColor(0, 0, 0);
+    for (let r = 0; r < moduleCount; r++) {
+      for (let c = 0; c < moduleCount; c++) {
+        if (qr.modules.get(r, c)) {
+          doc.rect(x + c * moduleSize, y + r * moduleSize, moduleSize, moduleSize, 'F');
+        }
+      }
+    }
+
+    // Subtle emerald border around QR box
+    doc.setDrawColor(167, 243, 208);
+    doc.setLineWidth(0.35);
+    doc.rect(x - 1, y - 1, sizeMm + 2, sizeMm + 2, 'S');
+
+    return true;
+  } catch (err) {
+    console.error('Failed to draw QR code:', err);
+    return false;
+  }
+}
+
+/**
+ * Generates and downloads a customer invoice PDF using actual saved bill data
  * @param {object} bill - Finalized bill object
- * @param {object|string} options - Configuration options or mode string ('thermal' | 'a4')
+ * @param {object|string} options - Configuration options or mode string ('a4' | 'thermal')
  */
 export function generateReceiptPDF(bill, options = {}) {
-  const mode = typeof options === 'string' ? options : (options.mode || 'thermal');
+  const mode = typeof options === 'string' ? options : (options.mode || 'a4');
   const autoDownload = typeof options === 'object' && options.autoDownload !== undefined ? options.autoDownload : true;
 
-  // Exact shop address: No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.
+  // Strict Shop Branding: Only FESTIVAL CLOTHING, zero MENSWEAR, zero Powered by WISDO TECH
   const store = {
-    name: bill.storeDetails?.name || 'FESTIVAL CLOTHING',
-    subtitle: bill.storeDetails?.subtitle || 'MENSWEAR',
-    address: bill.storeDetails?.address && !bill.storeDetails.address.includes('Main Bazaar')
-      ? bill.storeDetails.address
-      : 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
+    name: 'FESTIVAL CLOTHING',
+    address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
     phone: bill.storeDetails?.phone && bill.storeDetails.phone !== '+91 98400 12345' ? bill.storeDetails.phone : '',
-    receiptFooter: bill.storeDetails?.receiptFooter && !bill.storeDetails.receiptFooter.includes('7 days')
-      ? bill.storeDetails.receiptFooter
-      : 'Wishing you a Happy & Prosperous Celebration!',
   };
 
-  // Universal default: Every invoice and WhatsApp share renders the clean Thermal monospace receipt in A4
-  // Legacy multi-column graphic layout is only retained under mode: 'legacy_graphic'
-  if (mode !== 'legacy_graphic') {
+  if (mode === 'thermal') {
     // =========================================================================
-    // Thermal Receipt Format Scaled and Formatted in A4 Size (210mm x 297mm)
-    // Clean monospace typography, dashed dividers, and ~60-70% page utilization
+    // Thermal Receipt Format (80mm Monospace Scaled to A4)
     // =========================================================================
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -121,12 +165,7 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text(store.name, pageCenter, y, { align: 'center' });
-    y += 6;
-
-    doc.setFontSize(12);
-    doc.setFont('courier', 'bold');
-    doc.text(store.subtitle, pageCenter, y, { align: 'center' });
-    y += 5.5;
+    y += 6.5;
 
     doc.setFontSize(9.5);
     doc.setFont('courier', 'normal');
@@ -260,9 +299,10 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.line(totalsLeft - 4, y, marginRight, y);
     y += 5.5;
 
+    // FIX OVERLAPPING: Display FINAL PAYABLE only once, aligned neatly on right
     doc.setFont('courier', 'bold');
     doc.setFontSize(11);
-    doc.text('FINAL PAYABLE: (Final Payable Amount)', totalsLeft, y);
+    doc.text('FINAL PAYABLE:', totalsLeft, y);
     doc.text(`Rs. ${(bill.finalPayableAmount || 0).toFixed(2)}`, marginRight, y, { align: 'right' });
     y += 6;
     doc.line(totalsLeft - 4, y, marginRight, y);
@@ -283,15 +323,16 @@ export function generateReceiptPDF(bill, options = {}) {
       y += 5;
     }
 
-    // Proportional vertical spacing to comfortably utilize 60–70% of A4 page
-    y = Math.max(y + 12, 175);
+    // QR Code in thermal
+    const qrSize = 26;
+    drawBillQRCode(doc, bill, marginLeft + 2, y + 2, qrSize);
+
+    y = Math.max(y + qrSize + 8, 172);
 
     doc.line(marginLeft, y, marginRight, y);
     y += 6;
 
-    // Footer & Customer Thank You with Rotating Festive Quote
-    const festiveQuote = getBillFestiveQuote(bill);
-
+    // Footer & Customer Thank You
     doc.setFont('courier', 'bold');
     doc.setFontSize(10.5);
     doc.text('THANK YOU FOR SHOPPING WITH US!', pageCenter, y, { align: 'center' });
@@ -302,8 +343,20 @@ export function generateReceiptPDF(bill, options = {}) {
     doc.text('We truly appreciate your support.', pageCenter, y, { align: 'center' });
     y += 5;
 
+    // Attractive Diwali Greeting Footer
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(11);
+    doc.text('HAPPY DIWALI!', pageCenter, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont('courier', 'normal');
     doc.setFontSize(8.5);
-    doc.text(`"${festiveQuote}"`, pageCenter, y, { align: 'center', maxWidth: 160 });
+    doc.text('"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."', pageCenter, y, { align: 'center', maxWidth: 160 });
+    y += 5.5;
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('Thank you for choosing FESTIVAL CLOTHING!', pageCenter, y, { align: 'center' });
     y += 6;
 
     doc.setLineDashPattern([], 0);
@@ -313,7 +366,7 @@ export function generateReceiptPDF(bill, options = {}) {
 
     doc.setFont('courier', 'bold');
     doc.setFontSize(9.5);
-    doc.text('FESTIVAL CLOTHING — MENSWEAR', pageCenter, y, { align: 'center' });
+    doc.text('FESTIVAL CLOTHING', pageCenter, y, { align: 'center' });
 
     const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {
@@ -323,8 +376,8 @@ export function generateReceiptPDF(bill, options = {}) {
     return { doc, fileName, blob };
   } else {
     // =========================================================================
-    // Standard A4 Layout: Thermal Receipt Structure Scaled to A4 Portrait
-    // Designed to occupy 60%–70% of page height with clean emerald & white aesthetics
+    // Standard A4 Layout: Premium Emerald-Green & White Theme with Gold Accents
+    // Fits neatly on A4 (65%–75% height) with crisp vector QR and Diwali greeting
     // =========================================================================
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -336,100 +389,96 @@ export function generateReceiptPDF(bill, options = {}) {
     const marginLeft = 18;
     const marginRight = 192;
     const contentWidth = marginRight - marginLeft; // 174mm
+    const pageCenter = 105;
 
     // Deep emerald green accent bar at top
     doc.setFillColor(6, 78, 59); // Deep Emerald (#064e3b)
-    doc.rect(0, 0, pageWidth, 5.5, 'F');
+    doc.rect(0, 0, pageWidth, 5, 'F');
 
     let y = 16;
 
-    // Store Branding Header (Left)
+    // Store Branding Header (Left) - FESTIVAL CLOTHING only, zero MENSWEAR
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.setTextColor(6, 78, 59); // Deep Emerald
-    doc.text(store.name, marginLeft, y);
+    doc.text('FESTIVAL CLOTHING', marginLeft, y);
 
-    doc.setFontSize(11);
-    doc.setTextColor(5, 150, 105); // Emerald Green (#059669)
-    doc.text(store.subtitle, marginLeft, y + 6);
-
+    y += 6.5;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105); // Slate
-    doc.text(store.address, marginLeft, y + 12, { maxWidth: 95 });
+    doc.text(store.address, marginLeft, y, { maxWidth: 96 });
     if (store.phone) {
-      doc.text(`Phone: ${store.phone}`, marginLeft, y + 17);
+      doc.text(`Phone: ${store.phone}`, marginLeft, y + 5);
+      y += 5;
     }
 
     // Invoice Meta Header (Right)
     doc.setFillColor(240, 253, 244); // Light Mint (#f0fdf4)
-    doc.roundedRect(125, y - 4, 70, 8, 1, 1, 'F');
+    doc.roundedRect(126, 11, 66, 8, 1, 1, 'F');
     doc.setDrawColor(167, 243, 208); // Emerald border
-    doc.roundedRect(125, y - 4, 70, 8, 1, 1, 'S');
+    doc.roundedRect(126, 11, 66, 8, 1, 1, 'S');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(6, 78, 59);
-    doc.text('RETAIL INVOICE / SALES RECEIPT', 160, y + 1.5, { align: 'center' });
+    doc.text('RETAIL INVOICE / SALES RECEIPT', 159, 16.5, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(30, 41, 59);
-    doc.text(`Invoice No: ${bill.billNumber}`, marginRight, y + 9, { align: 'right' });
-    doc.text(`Date & Time: ${formatDateTime(bill.createdAt)}`, marginRight, y + 14, { align: 'right' });
+    doc.text(`Invoice No: ${bill.billNumber}`, marginRight, 24, { align: 'right' });
+    doc.text(`Date & Time: ${formatDateTime(bill.createdAt)}`, marginRight, 29, { align: 'right' });
 
     // Payment Status badge
     doc.setFont('helvetica', 'bold');
-    const statusText = bill.status === 'cancelled' ? 'STATUS: CANCELLED' : 'STATUS: PAID';
-    doc.setTextColor(bill.status === 'cancelled' ? 220 : 5, bill.status === 'cancelled' ? 38 : 150, bill.status === 'cancelled' ? 38 : 105);
-    doc.text(statusText, marginRight, y + 19, { align: 'right' });
+    const isCancelled = bill.status === 'cancelled';
+    const statusText = isCancelled ? 'STATUS: CANCELLED' : 'STATUS: PAID';
+    doc.setTextColor(isCancelled ? 220 : 5, isCancelled ? 38 : 150, isCancelled ? 38 : 105);
+    doc.text(statusText, marginRight, 34, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(30, 41, 59);
-    doc.text(`Payment: ${(bill.paymentMethod || 'cash').toUpperCase()}`, marginRight, y + 24, { align: 'right' });
+    doc.text(`Payment: ${(bill.paymentMethod || 'cash').toUpperCase()}`, marginRight, 39, { align: 'right' });
 
     if (bill.customerName) {
       const custInfo = bill.customerPhone ? `${bill.customerName} (${bill.customerPhone})` : bill.customerName;
-      doc.text(`Customer: ${custInfo}`, marginRight, y + 29, { align: 'right' });
-      y += 5;
+      doc.text(`Customer: ${custInfo}`, marginRight, 44, { align: 'right' });
     }
 
-    y += 28;
+    y = Math.max(y + 8, bill.customerName ? 48 : 44);
 
     // Clean subtle emerald separator line
     doc.setDrawColor(209, 250, 229);
     doc.setLineWidth(0.5);
     doc.line(marginLeft, y, marginRight, y);
-    y += 6;
+    y += 5;
 
-    // 6-Column Itemized Table Header: | S.No | Product | Qty | Original Price | Discount | Final Amount |
-    const colSNo = marginLeft + 4;
-    const colProduct = marginLeft + 16;
-    const colQty = marginLeft + 82;
-    const colOrig = marginLeft + 112;
-    const colDisc = marginLeft + 142;
-    const colFinal = marginRight - 4;
+    // 6-Column Itemized Table Header: | S.No | Product Description | Qty | Original Price | Discount | Final Amount |
+    const colSNo = marginLeft + 3; // 21
+    const colProduct = marginLeft + 14; // 32
+    const colQty = marginLeft + 92; // 110
+    const colOrig = marginLeft + 120; // 138
+    const colDisc = marginLeft + 148; // 166
+    const colFinal = marginRight - 3; // 189
 
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(marginLeft, y, contentWidth, 8.5, 1, 1, 'F');
+    doc.roundedRect(marginLeft, y, contentWidth, 8, 1, 1, 'F');
     doc.setDrawColor(167, 243, 208);
-    doc.roundedRect(marginLeft, y, contentWidth, 8.5, 1, 1, 'S');
+    doc.roundedRect(marginLeft, y, contentWidth, 8, 1, 1, 'S');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(6, 78, 59);
-    doc.text('S.No', colSNo, y + 5.5);
-    doc.text('Product Description', colProduct, y + 5.5);
-    doc.text('Qty', colQty, y + 5.5, { align: 'center' });
-    doc.text('Original Price', colOrig, y + 5.5, { align: 'right' });
-    doc.text('Discount', colDisc, y + 5.5, { align: 'right' });
-    doc.text('Final Amount', colFinal, y + 5.5, { align: 'right' });
-    y += 12;
+    doc.text('S.No', colSNo, y + 5.2, { align: 'center' });
+    doc.text('Product Description', colProduct, y + 5.2);
+    doc.text('Qty', colQty, y + 5.2, { align: 'center' });
+    doc.text('Original Price', colOrig, y + 5.2, { align: 'right' });
+    doc.text('Discount', colDisc, y + 5.2, { align: 'right' });
+    doc.text('Final Amount', colFinal, y + 5.2, { align: 'right' });
+    y += 11;
 
-    // Items List
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(30, 41, 59);
-
+    // Items list
     (bill.items || []).forEach((item, idx) => {
       const isCombo = Boolean(item.isCombo || item.productId?.includes('combo'));
       const origPrice = isCombo
@@ -439,40 +488,44 @@ export function generateReceiptPDF(bill, options = {}) {
       const lineSavings = red * item.qty;
       const displayName = isCombo ? `${item.name} (${item.piecesPerUnit || 3} Pcs)` : item.name;
 
+      const maxProdWidth = 72;
+      const prodLines = doc.splitTextToSize(displayName, maxProdWidth);
+      const rowHeight = Math.max(7.5, prodLines.length * 4.5 + 2);
+
       // Alternating row background for clean readability
       if (idx % 2 === 1) {
         doc.setFillColor(248, 250, 252);
-        doc.rect(marginLeft, y - 3, contentWidth, 8.5, 'F');
+        doc.rect(marginLeft, y - 2.5, contentWidth, rowHeight, 'F');
       }
 
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
-      doc.text(String(idx + 1), colSNo, y + 2.5);
-      doc.text(displayName, colProduct, y + 2.5);
-      doc.text(String(item.qty), colQty, y + 2.5, { align: 'center' });
-      doc.text(`Rs. ${(origPrice * item.qty).toFixed(2)}`, colOrig, y + 2.5, { align: 'right' });
+      doc.setTextColor(30, 41, 59);
+      doc.text(String(idx + 1), colSNo, y + 2, { align: 'center' });
+      doc.text(prodLines, colProduct, y + 2);
+      doc.text(String(item.qty), colQty, y + 2, { align: 'center' });
+      doc.text(`Rs. ${(origPrice * item.qty).toFixed(2)}`, colOrig, y + 2, { align: 'right' });
 
       if (lineSavings > 0) {
         doc.setTextColor(5, 150, 105);
         const label = isCombo ? `-Rs. ${lineSavings.toFixed(2)} (Combo)` : `-Rs. ${lineSavings.toFixed(2)}`;
-        doc.text(label, colDisc, y + 2.5, { align: 'right' });
+        doc.text(label, colDisc, y + 2, { align: 'right' });
         doc.setTextColor(30, 41, 59);
       } else {
-        doc.text('-', colDisc, y + 2.5, { align: 'right' });
+        doc.text('-', colDisc, y + 2, { align: 'right' });
       }
 
       doc.setFont('helvetica', 'bold');
-      doc.text(`Rs. ${item.lineTotal.toFixed(2)}`, colFinal, y + 2.5, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
+      doc.text(`Rs. ${item.lineTotal.toFixed(2)}`, colFinal, y + 2, { align: 'right' });
 
-      y += 8.5;
+      y += rowHeight;
     });
 
-    y += 2;
     doc.setDrawColor(226, 232, 240);
     doc.line(marginLeft, y, marginRight, y);
-    y += 7;
+    y += 5;
 
-    // Order Summary Calculation (Strictly avoiding double counting)
+    // Totals Calculation
     const origMerchandiseValue = (bill.items || []).reduce((acc, item) => {
       const isCombo = Boolean(item.isCombo || item.productId?.includes('combo'));
       const origPrice = isCombo
@@ -484,114 +537,138 @@ export function generateReceiptPDF(bill, options = {}) {
     const totalDiscount = (bill.totalReduction || 0) + (bill.comboSavings || 0);
     const finalPayable = bill.finalPayableAmount ?? (origMerchandiseValue - totalDiscount);
 
-    // Customer Store Appreciation on the Left
-    const termsStartY = y;
+    const summaryStartY = y;
+
+    // LEFT COLUMN: QR Code & Verification
+    const qrSize = 30; // 30mm x 30mm
+    const qrX = marginLeft + 2;
+    const qrY = summaryStartY + 1;
+    drawBillQRCode(doc, bill, qrX, qrY, qrSize);
+
+    // QR Label below code
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Customer Notice:', marginLeft, termsStartY);
+    doc.setFontSize(8);
+    doc.setTextColor(6, 78, 59);
+    doc.text('SCAN TO VERIFY INVOICE', qrX + (qrSize / 2), qrY + qrSize + 4.5, { align: 'center' });
+
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('• Thank you for visiting Festival Clothing Menswear.', marginLeft, termsStartY + 5);
-    doc.text('• We appreciate your valued business and support.', marginLeft, termsStartY + 9.5);
+    doc.text('Genuine Retail Bill Summary', qrX + (qrSize / 2), qrY + qrSize + 8, { align: 'center' });
 
-    // Order Summary Section on the Right
-    const totalsLeft = 115;
-    const totalsRight = marginRight - 4;
+    // RIGHT COLUMN: Order Summary Table
+    const totalsLeft = 116;
+    const totalsRight = marginRight - 3;
+    let rightY = summaryStartY;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
 
-    doc.text('Original Merchandise Value:', totalsLeft, y);
-    doc.text(`Rs. ${origMerchandiseValue.toFixed(2)}`, totalsRight, y, { align: 'right' });
-    y += 5;
+    doc.text('Original Merchandise Value:', totalsLeft, rightY);
+    doc.text(`Rs. ${origMerchandiseValue.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+    rightY += 5;
 
     if (bill.totalReduction > 0) {
       doc.setTextColor(5, 150, 105);
-      doc.text('Individual Product Discounts:', totalsLeft, y);
-      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, totalsRight, y, { align: 'right' });
-      y += 5;
+      doc.text('Individual Product Discounts:', totalsLeft, rightY);
+      doc.text(`-Rs. ${(bill.totalReduction || 0).toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+      rightY += 5;
     }
 
     if (bill.comboSavings > 0) {
       doc.setTextColor(5, 150, 105);
-      doc.text('Combo Savings:', totalsLeft, y);
-      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, totalsRight, y, { align: 'right' });
-      y += 5;
+      doc.text('Combo Savings:', totalsLeft, rightY);
+      doc.text(`-Rs. ${(bill.comboSavings || 0).toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+      rightY += 5;
     }
 
     if (totalDiscount > 0) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(5, 150, 105);
-      doc.text('Total Discount:', totalsLeft, y);
-      doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, totalsRight, y, { align: 'right' });
-      y += 5.5;
+      doc.text('Total Discount:', totalsLeft, rightY);
+      doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, totalsRight, rightY, { align: 'right' });
+      rightY += 5.5;
     }
 
-    // Grand Total Highlight Emerald Box
+    // Grand Total Highlight Emerald Box - FIX OVERLAPPING: FINAL PAYABLE only once, aligned right
+    const boxW = totalsRight - totalsLeft + 6;
+    const boxX = totalsLeft - 3;
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(totalsLeft - 3, y - 1, 80, 9, 1, 1, 'F');
+    doc.roundedRect(boxX, rightY, boxW, 9.5, 1.5, 1.5, 'F');
     doc.setDrawColor(5, 150, 105);
-    doc.roundedRect(totalsLeft - 3, y - 1, 80, 9, 1, 1, 'S');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(boxX, rightY, boxW, 9.5, 1.5, 1.5, 'S');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(6, 78, 59);
-    doc.text('Final Payable Amount:', totalsLeft, y + 5.5);
-    doc.text(`Rs. ${finalPayable.toFixed(2)}`, totalsRight, y + 5.5, { align: 'right' });
-    y += 14;
+    doc.text('FINAL PAYABLE:', totalsLeft, rightY + 6.2);
+    doc.setFontSize(11.5);
+    doc.text(`Rs. ${finalPayable.toFixed(2)}`, totalsRight, rightY + 6.2, { align: 'right' });
+    rightY += 14;
 
-    // Payment details box
+    // Payment Info
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Payment Method: ${(bill.paymentMethod || 'cash').toUpperCase()}`, totalsLeft, y);
-    y += 4.5;
+    doc.text(`Payment Mode: ${(bill.paymentMethod || 'cash').toUpperCase()}`, totalsLeft, rightY);
+    rightY += 4.5;
 
-    if (bill.paymentMethod === 'cash' && bill.tenderAmount) {
-      doc.text(`Cash Received: Rs. ${Number(bill.tenderAmount).toFixed(2)}`, totalsLeft, y);
-      y += 4.5;
-      doc.text(`Change Returned: Rs. ${Number(bill.changeDue || 0).toFixed(2)}`, totalsLeft, y);
-      y += 5;
+    if (bill.paymentMethod === 'cash' && (bill.amountReceived || bill.tenderAmount)) {
+      doc.text(`Cash Tendered: Rs. ${Number(bill.amountReceived || bill.tenderAmount).toFixed(2)}`, totalsLeft, rightY);
+      rightY += 4.5;
+      doc.text(`Change Returned: Rs. ${Number(bill.changeDue || 0).toFixed(2)}`, totalsLeft, rightY);
+      rightY += 5;
+    } else if (bill.paymentMethod === 'upi' && bill.upiRef) {
+      doc.text(`UPI Ref: ${bill.upiRef}`, totalsLeft, rightY);
+      rightY += 5;
     }
 
-    // Natural vertical spacing to reach ~60-70% page height (around y=175mm–190mm)
-    y = Math.max(y + 12, 175);
+    // Natural vertical spacing to reach ~60-70% page height
+    y = Math.max(rightY, qrY + qrSize + 12);
+    const bannerY = Math.max(y + 8, 168);
+    const bannerH = 26;
 
-    // Clean Premium Thank You Footer with Rotating Festive Quote
-    const festiveQuote = getBillFestiveQuote(bill);
+    // Attractive Diwali Festive Greeting Card with elegant gold accents
+    doc.setFillColor(255, 251, 235); // Festive Warm Cream (#fffbeb)
+    doc.roundedRect(marginLeft, bannerY, contentWidth, bannerH, 2, 2, 'F');
+    doc.setDrawColor(217, 119, 6); // Festive Gold (#d97706)
+    doc.setLineWidth(0.6);
+    doc.roundedRect(marginLeft, bannerY, contentWidth, bannerH, 2, 2, 'S');
 
+    // Inner gold decorative line
+    doc.setDrawColor(253, 230, 138); // Amber-200 (#fde68a)
+    doc.setLineWidth(0.3);
+    doc.roundedRect(marginLeft + 1.2, bannerY + 1.2, contentWidth - 2.4, bannerH - 2.4, 1.5, 1.5, 'S');
+
+    // HAPPY DIWALI!
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(6, 78, 59);
-    doc.text('THANK YOU FOR SHOPPING WITH US!', 105, y, { align: 'center' });
-    y += 5.5;
+    doc.setFontSize(12);
+    doc.setTextColor(180, 83, 9); // Rich Festive Gold (#b45309)
+    doc.text('* HAPPY DIWALI! *', pageCenter, bannerY + 7.5, { align: 'center' });
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text('We truly appreciate your support.', 105, y, { align: 'center' });
-    y += 6;
-
-    // Rotating Festive Quote
+    // Quote
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(5, 150, 105);
-    doc.text(`"${festiveQuote}"`, 105, y, { align: 'center', maxWidth: 160 });
-    y += 7;
+    doc.setFontSize(8.5);
+    doc.setTextColor(51, 65, 85); // Slate-700 (#334155)
+    doc.text('"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."', pageCenter, bannerY + 13.5, { align: 'center' });
 
-    // Bottom Separator
-    doc.setDrawColor(209, 250, 229);
-    doc.line(marginLeft, y, marginRight, y);
-    y += 5;
-
-    // Attribution branding
+    // Store Appreciation Sign-off
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(6, 78, 59);
-    doc.text('FESTIVAL CLOTHING - MENSWEAR', 105, y, { align: 'center' });
+    doc.setFontSize(9.5);
+    doc.setTextColor(6, 78, 59); // Deep Emerald (#064e3b)
+    doc.text('Thank you for choosing FESTIVAL CLOTHING!', pageCenter, bannerY + 20.5, { align: 'center' });
+
+    // Bottom Branding Footer
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('FESTIVAL CLOTHING', pageCenter, bannerY + bannerH + 6, { align: 'center' });
+
+    // Bottom deep emerald bar
+    doc.setFillColor(6, 78, 59);
+    doc.rect(0, 292, pageWidth, 5, 'F');
 
     const fileName = `${bill.billNumber}_Invoice.pdf`;
     if (autoDownload) {

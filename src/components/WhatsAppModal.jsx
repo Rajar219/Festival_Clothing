@@ -49,10 +49,10 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     hasDownloadedRef.current = false;
     isExecutingRef.current = false;
 
-    // Pre-generate Thermal A4 PDF once for this bill
+    // Pre-generate A4 Invoice PDF once for this bill
     if (bill) {
       try {
-        const result = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
+        const result = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
         cachedPdfRef.current = result;
         setIsPdfReady(true);
       } catch (err) {
@@ -86,7 +86,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
       return cachedPdfRef.current;
     }
     try {
-      const res = generateReceiptPDF(bill, { mode: 'thermal', autoDownload: false });
+      const res = generateReceiptPDF(bill, { mode: 'a4', autoDownload: false });
       cachedPdfRef.current = res;
       setIsPdfReady(true);
       return res;

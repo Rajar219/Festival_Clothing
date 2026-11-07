@@ -100,8 +100,8 @@ export function SalesReportsView({ defaultTab = 'history' }) {
 
   const handleDownloadBillPDF = (bill) => {
     try {
-      generateReceiptPDF(bill, { mode: 'thermal', autoDownload: true });
-      showToast(`Thermal PDF invoice downloaded for ${bill.billNumber}`, 'success');
+      generateReceiptPDF(bill, { mode: 'a4', autoDownload: true });
+      showToast(`Invoice PDF downloaded for ${bill.billNumber}`, 'success');
     } catch (err) {
       showToast('Failed to generate PDF: ' + err.message, 'error');
     }

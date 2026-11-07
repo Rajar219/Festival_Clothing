@@ -5,12 +5,10 @@ import { getBillFestiveQuote } from '../services/db';
 export function ReceiptPrintView({ bill, mode = 'thermal' }) {
   if (!bill) return null;
 
-  const store = bill.storeDetails || {
+  const store = {
     name: 'FESTIVAL CLOTHING',
-    subtitle: 'MENSWEAR',
     address: 'No. 10/12, N.N. Garden, Old Washermenpet, Chennai - 21, Tamil Nadu.',
-    phone: '',
-    receiptFooter: 'Wishing you a Happy & Prosperous Celebration!',
+    phone: bill.storeDetails?.phone && bill.storeDetails.phone !== '+91 98400 12345' ? bill.storeDetails.phone : '',
   };
 
   const festiveQuote = getBillFestiveQuote(bill);
@@ -23,7 +21,6 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
         {/* Header with configured shop name */}
         <div className="receipt-header">
           <h1 className="receipt-store-name">{store.name}</h1>
-          <h2 className="receipt-subtitle">{store.subtitle}</h2>
           <div className="receipt-address">{store.address}</div>
           {store.phone && <div className="receipt-phone">Ph: {store.phone}</div>}
           <div className="receipt-badge-title">RETAIL INVOICE</div>
@@ -165,12 +162,11 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
 
         <div className="receipt-divider-dashed" />
 
-        {/* Footer with Customer Thank You & Rotating Festive Quote */}
+        {/* Footer with Diwali Greeting & Customer Appreciation */}
         <div className="receipt-footer">
-          <p className="thank-you-msg">THANK YOU FOR SHOPPING WITH US!</p>
-          <p className="thank-you-submsg">We truly appreciate your support.</p>
-          <p className="footer-festive-quote">"{festiveQuote}"</p>
-          <p className="footer-brand-title">FESTIVAL CLOTHING — MENSWEAR</p>
+          <p className="thank-you-msg">★ HAPPY DIWALI! ★</p>
+          <p className="thank-you-submsg">"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."</p>
+          <p className="footer-brand-title">Thank you for choosing FESTIVAL CLOTHING!</p>
         </div>
       </div>
     );
@@ -192,7 +188,6 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       <div className="a4-header-box">
         <div className="a4-header-left">
           <h1 className="a4-store-name">{store.name}</h1>
-          <h2 className="a4-store-sub">{store.subtitle}</h2>
           <p className="a4-store-addr">{store.address}</p>
           {store.phone && <p className="a4-store-contact">Phone: {store.phone}</p>}
         </div>
@@ -340,13 +335,13 @@ export function ReceiptPrintView({ bill, mode = 'thermal' }) {
       </div>
 
       <div className="a4-footer-thanks">
-        <p className="a4-thanks-main">THANK YOU FOR SHOPPING WITH US!</p>
-        <p className="a4-thanks-sub">We truly appreciate your support.</p>
-        <p className="a4-festive-quote">"{festiveQuote}"</p>
+        <p className="a4-thanks-main" style={{ color: '#b45309', fontWeight: 800 }}>★ HAPPY DIWALI! ★</p>
+        <p className="a4-thanks-sub">"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."</p>
+        <p className="a4-festive-quote" style={{ color: '#064e3b', fontWeight: 700 }}>Thank you for choosing FESTIVAL CLOTHING!</p>
       </div>
 
       <div className="a4-company-attribution">
-        <strong>FESTIVAL CLOTHING — MENSWEAR</strong>
+        <strong>FESTIVAL CLOTHING</strong>
       </div>
     </div>
   );
