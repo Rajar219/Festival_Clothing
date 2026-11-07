@@ -4,6 +4,7 @@ import { useModalBehavior } from '../hooks/useModalBehavior';
 import {
   validateIndianMobile,
   generateWhatsAppDirectChatText,
+  generateMobileWhatsAppGreeting,
   generateReceiptPDF,
 } from '../utils/receiptGenerator';
 import { formatINR, formatDateTime } from '../utils/currency';
@@ -136,31 +137,46 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
     try {
       // 1. Generate or retrieve the invoice PDF as Blob/File
       const pdfResult = ensurePdf();
-      if (!pdfResult?.blob) {
+      if (!pdfResult?.blob || pdfResult.blob.size === 0) {
         showToast('Could not generate invoice PDF', 'error');
         return;
       }
 
-      // 2. Prepare the exact customer greeting and invoice details message
-      const message = generateWhatsAppDirectChatText(bill);
       const fileName = pdfResult.fileName || `${bill.billNumber}_Invoice.pdf`;
-      const pdfFile = new File([pdfResult.blob], fileName, { type: 'application/pdf' });
+      const pdfFile = new File([pdfResult.blob], fileName, {
+        type: 'application/pdf',
+        lastModified: Date.now(),
+      });
 
-      // 3. Determine if device supports native file sharing (Android Web Share API)
+      // Verify valid PDF File object
+      if (!(pdfFile instanceof File) || pdfFile.size === 0) {
+        showToast('Invalid invoice PDF file generated', 'error');
+        return;
+      }
+
+      // 2. Build the complete mobile WhatsApp greeting message
+      const mobileGreeting = generateMobileWhatsAppGreeting(bill);
+      if (typeof mobileGreeting !== 'string' || !mobileGreeting.trim()) {
+        showToast('Failed to build greeting message', 'error');
+        return;
+      }
+
+      // 3. Check navigator.canShare({ files: [pdfFile] }) before sharing
       const isNativeShareSupported = checkCanShareFile(pdfFile);
 
       if (isNativeShareSupported) {
         // =========================================================================
         // PLATFORM 1: MOBILE (ANDROID)
-        // - ONE native Web Share API call with BOTH PDF file and message
-        // - No separate download
-        // - No separate window opening
+        // - Pass BOTH the PDF and message in the SAME native Web Share API call:
+        //   navigator.share({ files: [pdfFile], text: message })
+        // - Single share call (not called twice)
+        // - No wa.me or separate WhatsApp window opening before or after
+        // - No separate PDF download
         // =========================================================================
         try {
           await navigator.share({
-            title: `FESTIVAL CLOTHING Invoice #${bill.billNumber}`,
-            text: message,
             files: [pdfFile],
+            text: mobileGreeting,
           });
 
           // Only executed when the user completes the native share action
@@ -172,7 +188,7 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
             });
           }
           setSharingStatus('shared_native');
-          showToast('Invoice PDF and message shared together!', 'success');
+          showToast('Invoice PDF and greeting message shared together!', 'success');
           onClose();
         } catch (err) {
           if (err.name === 'AbortError') {
@@ -185,12 +201,13 @@ export function WhatsAppModal({ isOpen, onClose, bill, onSharingIncomplete }) {
         }
       } else {
         // =========================================================================
-        // PLATFORM 2: WINDOWS PC
+        // PLATFORM 2: WINDOWS PC (UNCHANGED)
         // - Validate customer mobile number
         // - Download PDF once to local PC
         // - Open ONLY installed WhatsApp Desktop application via protocol deep link
-        // - Clear, honest fallback: cashier manually attaches already-generated PDF
+        // - Clear fallback: cashier manually attaches already-generated PDF
         // =========================================================================
+        const message = generateWhatsAppDirectChatText(bill);
         const validation = validateIndianMobile(mobileNumber);
         if (!validation.isValid) {
           setErrorMsg(validation.error);

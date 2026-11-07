@@ -48,6 +48,32 @@ export function generateWhatsAppDirectChatText(bill) {
 }
 
 /**
+ * Builds the complete WhatsApp greeting message for Android mobile sharing
+ * Includes:
+ * - Happy Diwali greeting
+ * - Customer thank-you message
+ * - Bill number
+ * - Final payable amount
+ */
+export function generateMobileWhatsAppGreeting(bill) {
+  const billNumber = bill?.billNumber || '';
+  const total = Number(
+    bill?.finalPayableAmount !== undefined ? bill.finalPayableAmount : (bill?.total || 0)
+  ).toLocaleString('en-IN');
+
+  return [
+    '*HAPPY DIWALI!*',
+    '"May this Festival of Lights fill your home with happiness, prosperity and beautiful moments."',
+    '',
+    'Thanks for purchasing from FESTIVAL CLOTHING!',
+    'We truly appreciate your support. Visit us again!',
+    '',
+    `Invoice No: ${billNumber}`,
+    `Final Payable Amount: ₹${total}`,
+  ].join('\n');
+}
+
+/**
  * Generates formatted WhatsApp itemized receipt text from actual finalized transaction
  * Follows exact two-line greeting specification:
  * Line 1: Thanks for purchasing from FESTIVAL CLOTHING!

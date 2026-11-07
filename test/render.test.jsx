@@ -7,7 +7,7 @@ import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
 import { FESTIVE_QUOTES, getBillFestiveQuote } from '../src/services/db';
 import { SalesReportsView } from '../src/components/SalesReportsView';
 import { WhatsAppModal } from '../src/components/WhatsAppModal';
-import { generateWhatsAppDirectChatText } from '../src/utils/receiptGenerator';
+import { generateWhatsAppDirectChatText, generateMobileWhatsAppGreeting } from '../src/utils/receiptGenerator';
 import fs from 'fs';
 import path from 'path';
 
@@ -484,13 +484,21 @@ describe('App Render & Responsive Design Test', () => {
       createdAt: new Date().toISOString(),
     };
 
-    // 1. Verify exact message format
+    // 1. Verify exact message format for PC
     const text = generateWhatsAppDirectChatText(sampleBill);
     expect(text).toBe(
       'Thanks for purchasing from FESTIVAL CLOTHING!\n\nWe truly appreciate your support. Visit us again!\n\nInvoice No: FC-20261107-0042\nTotal Amount: ₹1,250'
     );
 
-    // 2. Verify WhatsAppModal rendering
+    // 2. Verify exact mobile WhatsApp greeting format (Diwali greeting, thank-you, bill no, final amount)
+    const mobileText = generateMobileWhatsAppGreeting(sampleBill);
+    expect(mobileText).toContain('*HAPPY DIWALI!*');
+    expect(mobileText).toContain('Thanks for purchasing from FESTIVAL CLOTHING!');
+    expect(mobileText).toContain('We truly appreciate your support. Visit us again!');
+    expect(mobileText).toContain('Invoice No: FC-20261107-0042');
+    expect(mobileText).toContain('Final Payable Amount: ₹1,250');
+
+    // 3. Verify WhatsAppModal rendering
     const modalHtml = renderToString(
       <POSProvider>
         <WhatsAppModal isOpen={true} onClose={() => {}} bill={sampleBill} />
