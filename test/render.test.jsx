@@ -449,6 +449,28 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('Plus Jakarta Sans');
   });
 
+  it('verifies Mobile Header rules display logo prominently and remove text and right status pills', () => {
+    const cssPath = path.resolve(__dirname, '../src/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Verify mobile header media query exists and sets compact centered layout
+    expect(cssContent).toContain('@media (max-width: 860px)');
+    expect(cssContent).toContain('.header-brand-logo-img');
+    expect(cssContent).toContain('height: 38px !important');
+    expect(cssContent).toContain('.brand-text');
+    expect(cssContent).toContain('.header-right');
+
+    // Verify App renders Header with logo and clickable brand container
+    const appHtml = renderToString(
+      <POSProvider>
+        <App />
+      </POSProvider>
+    );
+    expect(appHtml).toContain('header-brand-logo-img');
+    expect(appHtml).toContain('/logo.png');
+    expect(appHtml).toContain('brand-logo-container');
+  });
+
   describe('Page Refresh Navigation & Route Persistence', () => {
     it('verifies normalizePOSView normalizes views and maps sales to history', () => {
       expect(normalizePOSView('history')).toBe('history');

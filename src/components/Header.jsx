@@ -95,7 +95,7 @@ export function Header() {
               alt="FESTIVAL CLOTHING"
               className="header-brand-logo-img"
             />
-            <div className="brand-text">
+            <div className="brand-text desktop-only">
               <div className="brand-title-row">
                 <span className="brand-main-title">FESTIVAL CLOTHING</span>
                 <span className="brand-subtitle-badge">{settings.subtitle || 'MENSWEAR'}</span>
@@ -152,7 +152,7 @@ export function Header() {
         </nav>
 
         {/* Desktop Right: Status Indicators & Authentication */}
-        <div className="header-right">
+        <div className="header-right desktop-only">
           {/* Subtle Terminal Badge */}
           <span
             className="header-subtle-badge header-terminal-badge"
