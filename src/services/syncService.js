@@ -109,7 +109,22 @@ export async function syncWithBackend() {
   try {
     const db = await getDB();
     const localBills = await db.getAll('bills');
-    const { syncedCount, remoteBills } = await syncBillsWithFirestore(localBills);
+    const { syncedCount, remoteBills, error } = await syncBillsWithFirestore(localBills);
+
+    if (error) {
+      const isPermission = error.code === 'permission-denied' ||
+        (error.message && error.message.toLowerCase().includes('permission'));
+      currentSyncStatus = 'offline';
+      lastSyncMessage = isPermission
+        ? 'Firestore Rules: Permission Denied. Please set read/write rules to true in Firebase Console Rules tab.'
+        : `Cloud sync notice: ${error.message || 'Check connection'}`;
+      notifyListeners();
+      return {
+        success: false,
+        status: isPermission ? 'permission-denied' : 'error',
+        message: lastSyncMessage,
+      };
+    }
 
     // Merge remote bills from other devices into local IndexedDB
     for (const rb of remoteBills) {

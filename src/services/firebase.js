@@ -23,14 +23,15 @@ import {
 } from 'firebase/firestore';
 import { getDB } from './db';
 
-// Safely read Firebase configuration from environment with permanent production fallback
+// Safely read Firebase configuration from environment with verified production fallback
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCdhEIUN67N60XHn3JmLhRCZUxNqFhA98c',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCdhEIUN67N6BXHn3JmLhRC2UxNqFhA90c',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'festival-a21f4.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'festival-a21f4',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'festival-a21f4.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '180763761780',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:180763761780:web:14ee9a26aad93e8a79c871',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-JLE6XGMZ0L',
 };
 
 export function isFirebaseConfigured() {
@@ -327,8 +328,11 @@ function sanitizeForFirestore(obj) {
  */
 export async function syncBillsWithFirestore(localBills) {
   if (!firestoreDb) {
-    return { syncedCount: 0, remoteBills: [] };
+    return { syncedCount: 0, remoteBills: [], error: new Error('Firestore not initialized') };
   }
+
+  let syncError = null;
+  let successfulUploads = 0;
 
   // 1. Upload un-synced local bills
   const unSynced = (localBills || []).filter((b) => b.syncStatus !== 'synced');
@@ -342,8 +346,10 @@ export async function syncBillsWithFirestore(localBills) {
         syncedAt: new Date().toISOString(),
       });
       await setDoc(docRef, cleanData, { merge: true });
+      successfulUploads++;
     } catch (e) {
       console.warn('Failed to upload bill to Firestore:', b.billNumber, e);
+      syncError = e;
     }
   }
 
@@ -356,11 +362,13 @@ export async function syncBillsWithFirestore(localBills) {
     });
   } catch (err) {
     console.warn('Failed to fetch bills from Firestore:', err);
+    syncError = err;
   }
 
   return {
-    syncedCount: unSynced.length,
+    syncedCount: successfulUploads,
     remoteBills,
+    error: syncError,
   };
 }
 
@@ -369,7 +377,7 @@ export async function syncBillsWithFirestore(localBills) {
  * Whenever any device (PC or mobile) creates or cancels a bill,
  * this listener fires immediately!
  */
-export function subscribeFirestoreBills(onBillsUpdated) {
+export function subscribeFirestoreBills(onBillsUpdated, onError) {
   if (!firestoreDb) return () => {};
 
   try {
@@ -385,10 +393,16 @@ export function subscribeFirestoreBills(onBillsUpdated) {
       },
       (err) => {
         console.warn('Firestore real-time listener notice:', err);
+        if (typeof onError === 'function') {
+          onError(err);
+        }
       }
     );
   } catch (err) {
     console.warn('Failed to attach Firestore live listener:', err);
+    if (typeof onError === 'function') {
+      onError(err);
+    }
     return () => {};
   }
 }

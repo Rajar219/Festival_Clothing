@@ -755,12 +755,14 @@ export function POSProvider({ children }) {
     setAllBills(refreshed);
     if (res?.status === 'success') {
       showToast(`Cross-device sync complete! (${refreshed.length} total bills)`, 'success');
+    } else if (res?.status === 'permission-denied') {
+      showToast('Firebase Rules: Permission Denied. Please set read/write rules to true in Firebase Console.', 'error');
     } else if (res?.status === 'unconfigured') {
       showToast('Central database not yet connected in Vercel. Operating in local-first mode.', 'warning');
     } else if (res?.status === 'offline') {
       showToast('Device is offline. Pending bills will sync when reconnected.', 'warning');
     } else {
-      showToast('Sync notice: ' + (res?.error || 'Could not reach server'), 'warning');
+      showToast(res?.message || ('Sync notice: ' + (res?.error || 'Could not reach server')), 'warning');
     }
   }, [showToast]);
 
