@@ -49,6 +49,8 @@ import {
 
 export function SalesReportsView({ defaultTab = 'history' }) {
   const {
+    currentView,
+    setCurrentView,
     allBills,
     products,
     refreshBills,
@@ -65,13 +67,22 @@ export function SalesReportsView({ defaultTab = 'history' }) {
     terminalInfo,
   } = usePOS();
 
-  const [activeViewMode, setActiveViewMode] = useState(defaultTab); // 'history' | 'reports'
+  const [activeViewMode, setActiveViewMode] = useState(() => {
+    if (currentView === 'reports' || defaultTab === 'reports') return 'reports';
+    return 'history';
+  });
 
   useEffect(() => {
-    if (defaultTab) {
-      setActiveViewMode(defaultTab);
+    const targetMode = currentView === 'reports' || defaultTab === 'reports' ? 'reports' : 'history';
+    setActiveViewMode(targetMode);
+  }, [currentView, defaultTab]);
+
+  const handleSubTabSwitch = (mode) => {
+    setActiveViewMode(mode);
+    if (setCurrentView) {
+      setCurrentView(mode);
     }
-  }, [defaultTab]);
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
@@ -454,7 +465,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             type="button"
             id="btn-subtab-history"
             className={`subview-tab-btn ${activeViewMode === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveViewMode('history')}
+            onClick={() => handleSubTabSwitch('history')}
           >
             <History size={16} />
             <span>Sales History ({filteredBills.length})</span>
@@ -463,7 +474,7 @@ export function SalesReportsView({ defaultTab = 'history' }) {
             type="button"
             id="btn-subtab-reports"
             className={`subview-tab-btn ${activeViewMode === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveViewMode('reports')}
+            onClick={() => handleSubTabSwitch('reports')}
           >
             <BarChart3 size={16} />
             <span>Reports & Analytics</span>

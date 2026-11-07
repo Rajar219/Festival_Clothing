@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import App from '../src/App';
-import { POSProvider } from '../src/context/POSContext';
+import { POSProvider, normalizePOSView, getInitialPOSView } from '../src/context/POSContext';
 import { PriceSelectorModal } from '../src/components/PriceSelectorModal';
 import { FESTIVE_QUOTES, getBillFestiveQuote } from '../src/services/db';
 import { SalesReportsView } from '../src/components/SalesReportsView';
@@ -375,5 +375,227 @@ describe('App Render & Responsive Design Test', () => {
     expect(cssContent).toContain('.sales-history-grand-total-chip');
     expect(cssContent).toContain('.grand-total-amount');
     expect(cssContent).toContain('font-weight: 800');
+  });
+
+  describe('Page Refresh Navigation & Route Persistence', () => {
+    it('verifies normalizePOSView normalizes views and maps sales to history', () => {
+      expect(normalizePOSView('history')).toBe('history');
+      expect(normalizePOSView('reports')).toBe('reports');
+      expect(normalizePOSView('settings')).toBe('settings');
+      expect(normalizePOSView('billing')).toBe('billing');
+      expect(normalizePOSView('sales')).toBe('history');
+      expect(normalizePOSView('/reports/')).toBe('reports');
+      expect(normalizePOSView('INVALID')).toBe(null);
+      expect(normalizePOSView(null)).toBe(null);
+    });
+
+    it('verifies getInitialPOSView restores active route from URL query parameters', () => {
+      const storageMap = new Map();
+      const mockStorage = {
+        getItem: (k) => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v)),
+        removeItem: (k) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+      };
+
+      const hadWindow = 'window' in globalThis;
+      const hadLocalStorage = 'localStorage' in globalThis;
+      const origWindow = globalThis.window;
+      const origLocalStorage = globalThis.localStorage;
+
+      globalThis.localStorage = mockStorage;
+      globalThis.window = {
+        location: {
+          search: '?view=history',
+          pathname: '/',
+          hash: '',
+          href: 'https://festival-clothing.vercel.app/?view=history',
+        },
+        localStorage: mockStorage,
+      };
+
+      expect(getInitialPOSView()).toBe('history');
+
+      // Test reports
+      globalThis.window.location.search = '?view=reports';
+      expect(getInitialPOSView()).toBe('reports');
+
+      // Test settings
+      globalThis.window.location.search = '?view=settings';
+      expect(getInitialPOSView()).toBe('settings');
+
+      // Test billing
+      globalThis.window.location.search = '?view=billing';
+      expect(getInitialPOSView()).toBe('billing');
+
+      if (hadWindow) globalThis.window = origWindow; else delete globalThis.window;
+      if (hadLocalStorage) globalThis.localStorage = origLocalStorage; else delete globalThis.localStorage;
+    });
+
+    it('verifies getInitialPOSView restores active route from URL pathname', () => {
+      const storageMap = new Map();
+      const mockStorage = {
+        getItem: (k) => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v)),
+        removeItem: (k) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+      };
+
+      const hadWindow = 'window' in globalThis;
+      const hadLocalStorage = 'localStorage' in globalThis;
+      const origWindow = globalThis.window;
+      const origLocalStorage = globalThis.localStorage;
+
+      globalThis.localStorage = mockStorage;
+      globalThis.window = {
+        location: {
+          search: '',
+          pathname: '/reports',
+          hash: '',
+          href: 'https://festival-clothing.vercel.app/reports',
+        },
+        localStorage: mockStorage,
+      };
+
+      expect(getInitialPOSView()).toBe('reports');
+
+      globalThis.window.location.pathname = '/settings';
+      expect(getInitialPOSView()).toBe('settings');
+
+      globalThis.window.location.pathname = '/history';
+      expect(getInitialPOSView()).toBe('history');
+
+      if (hadWindow) globalThis.window = origWindow; else delete globalThis.window;
+      if (hadLocalStorage) globalThis.localStorage = origLocalStorage; else delete globalThis.localStorage;
+    });
+
+    it('verifies getInitialPOSView falls back to localStorage if URL has no view param', () => {
+      const storageMap = new Map();
+      const mockStorage = {
+        getItem: (k) => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v)),
+        removeItem: (k) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+      };
+
+      const hadWindow = 'window' in globalThis;
+      const hadLocalStorage = 'localStorage' in globalThis;
+      const origWindow = globalThis.window;
+      const origLocalStorage = globalThis.localStorage;
+
+      globalThis.localStorage = mockStorage;
+      globalThis.window = {
+        location: {
+          search: '',
+          pathname: '/',
+          hash: '',
+          href: 'https://festival-clothing.vercel.app/',
+        },
+        localStorage: mockStorage,
+      };
+
+      mockStorage.setItem('festival_pos_active_view', 'settings');
+      expect(getInitialPOSView()).toBe('settings');
+
+      mockStorage.setItem('festival_pos_active_view', 'reports');
+      expect(getInitialPOSView()).toBe('reports');
+
+      mockStorage.setItem('festival_pos_active_view', 'history');
+      expect(getInitialPOSView()).toBe('history');
+
+      mockStorage.removeItem('festival_pos_active_view');
+      expect(getInitialPOSView()).toBe('billing');
+
+      if (hadWindow) globalThis.window = origWindow; else delete globalThis.window;
+      if (hadLocalStorage) globalThis.localStorage = origLocalStorage; else delete globalThis.localStorage;
+    });
+
+    it('renders App directly into Sales History when refreshing with ?view=history', () => {
+      const storageMap = new Map();
+      const mockStorage = {
+        getItem: (k) => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v)),
+        removeItem: (k) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+      };
+
+      const hadWindow = 'window' in globalThis;
+      const hadLocalStorage = 'localStorage' in globalThis;
+      const origWindow = globalThis.window;
+      const origLocalStorage = globalThis.localStorage;
+
+      globalThis.localStorage = mockStorage;
+      globalThis.window = {
+        location: {
+          search: '?view=history',
+          pathname: '/',
+          hash: '',
+          href: 'https://festival-clothing.vercel.app/?view=history',
+        },
+        history: {
+          pushState: () => {},
+          replaceState: () => {},
+        },
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        localStorage: mockStorage,
+      };
+
+      const html = renderToString(
+        <POSProvider>
+          <App />
+        </POSProvider>
+      );
+
+      // Verify Sales History table or header is rendered instead of default billing layout
+      expect(html).toContain('Sales History');
+      expect(html).toContain('subview-tab-bar');
+
+      if (hadWindow) globalThis.window = origWindow; else delete globalThis.window;
+      if (hadLocalStorage) globalThis.localStorage = origLocalStorage; else delete globalThis.localStorage;
+    });
+
+    it('renders App directly into Reports when refreshing with ?view=reports', () => {
+      const storageMap = new Map();
+      const mockStorage = {
+        getItem: (k) => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v)),
+        removeItem: (k) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+      };
+
+      const hadWindow = 'window' in globalThis;
+      const hadLocalStorage = 'localStorage' in globalThis;
+      const origWindow = globalThis.window;
+      const origLocalStorage = globalThis.localStorage;
+
+      globalThis.localStorage = mockStorage;
+      globalThis.window = {
+        location: {
+          search: '?view=reports',
+          pathname: '/',
+          hash: '',
+          href: 'https://festival-clothing.vercel.app/?view=reports',
+        },
+        history: {
+          pushState: () => {},
+          replaceState: () => {},
+        },
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        localStorage: mockStorage,
+      };
+
+      const html = renderToString(
+        <POSProvider>
+          <App />
+        </POSProvider>
+      );
+
+      expect(html).toContain('Reports &amp; Analytics');
+
+      if (hadWindow) globalThis.window = origWindow; else delete globalThis.window;
+      if (hadLocalStorage) globalThis.localStorage = origLocalStorage; else delete globalThis.localStorage;
+    });
   });
 });

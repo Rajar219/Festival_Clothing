@@ -63,23 +63,180 @@ import {
 
 export const POSContext = createContext(null);
 
+export const VALID_POS_VIEWS = ['billing', 'history', 'reports', 'settings', 'products', 'sales'];
+
+export function normalizePOSView(viewName) {
+  if (!viewName || typeof viewName !== 'string') return null;
+  const cleaned = viewName.toLowerCase().trim().replace(/^\/+|\/+$/g, '');
+  if (cleaned === 'sales') return 'history';
+  return VALID_POS_VIEWS.includes(cleaned) ? cleaned : null;
+}
+
+export function getInitialPOSView() {
+  if (typeof window === 'undefined') return 'billing';
+
+  // 1. Check URL query parameters (?view=history / ?view=reports / ?view=settings / ?view=billing)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = normalizePOSView(params.get('view'));
+    if (viewParam) return viewParam;
+  } catch (e) {}
+
+  // 2. Check URL pathname (/history, /reports, /settings, /products, /billing)
+  try {
+    const pathPart = window.location.pathname.replace(/^\/+|\/+$/g, '');
+    const pathView = normalizePOSView(pathPart);
+    if (pathView) return pathView;
+  } catch (e) {}
+
+  // 3. Check URL hash (#history, #/reports, etc.)
+  try {
+    const hashPart = window.location.hash.replace(/^#\/?/, '');
+    const hashView = normalizePOSView(hashPart);
+    if (hashView) return hashView;
+  } catch (e) {}
+
+  // 4. Check persisted active route in localStorage
+  try {
+    const persisted = localStorage.getItem('festival_pos_active_view');
+    const persistedView = normalizePOSView(persisted);
+    if (persistedView) return persistedView;
+  } catch (e) {}
+
+  return 'billing';
+}
+
 export function POSProvider({ children }) {
-  // Navigation View: 'billing' | 'sales' | 'products' | 'settings'
-  const [currentView, setCurrentView] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const v = params.get('view');
-      if (v && ['billing', 'history', 'reports', 'sales', 'products', 'settings'].includes(v)) {
-        return v;
+  // Navigation View: 'billing' | 'history' | 'reports' | 'settings' | 'products'
+  const [currentView, setCurrentViewInternal] = useState(getInitialPOSView);
+
+  // Synchronized URL & History Navigation Handler
+  const setCurrentView = useCallback((targetViewOrUpdater, options = {}) => {
+    const { replace = false, syncHistory = true } = options;
+
+    setCurrentViewInternal((prevView) => {
+      const nextRaw = typeof targetViewOrUpdater === 'function'
+        ? targetViewOrUpdater(prevView)
+        : targetViewOrUpdater;
+
+      const normalized = normalizePOSView(nextRaw) || 'billing';
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('festival_pos_active_view', normalized);
+        } catch (e) {}
+
+        if (syncHistory) {
+          try {
+            const currentUrl = new URL(window.location.href);
+            const currentParam = currentUrl.searchParams.get('view') || 'billing';
+
+            if (normalized === 'billing') {
+              currentUrl.searchParams.delete('view');
+              if (normalizePOSView(currentUrl.pathname.replace(/^\/+/, '')) === 'billing') {
+                currentUrl.pathname = '/';
+              }
+            } else {
+              currentUrl.searchParams.set('view', normalized);
+            }
+
+            const targetUrl = currentUrl.pathname + (currentUrl.searchParams.toString() ? '?' + currentUrl.searchParams.toString() : '') + currentUrl.hash;
+
+            if (replace) {
+              window.history.replaceState({ view: normalized }, '', targetUrl);
+            } else if (currentParam !== normalized || window.location.pathname !== currentUrl.pathname) {
+              window.history.pushState({ view: normalized }, '', targetUrl);
+            }
+          } catch (e) {
+            console.warn('History navigation sync error:', e);
+          }
+        }
       }
+
+      return normalized;
+    });
+  }, []);
+
+  // Synchronize initial URL and listen to browser Back / Forward events (popstate)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const currentParam = new URLSearchParams(window.location.search).get('view');
+      const normalizedCurrent = normalizePOSView(currentView) || 'billing';
+
+      if (!currentParam && normalizedCurrent !== 'billing') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('view', normalizedCurrent);
+        const targetUrl = url.pathname + '?' + url.searchParams.toString() + url.hash;
+        window.history.replaceState({ view: normalizedCurrent }, '', targetUrl);
+      } else if (currentParam && normalizePOSView(currentParam) !== normalizedCurrent) {
+        const url = new URL(window.location.href);
+        if (normalizedCurrent === 'billing') {
+          url.searchParams.delete('view');
+        } else {
+          url.searchParams.set('view', normalizedCurrent);
+        }
+        const targetUrl = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash;
+        window.history.replaceState({ view: normalizedCurrent }, '', targetUrl);
+      }
+      localStorage.setItem('festival_pos_active_view', normalizedCurrent);
+    } catch (e) {}
+
+    const handlePopState = (event) => {
+      const popped = event.state?.view || getInitialPOSView();
+      const normalized = normalizePOSView(popped) || 'billing';
+      setCurrentViewInternal(normalized);
+      try {
+        localStorage.setItem('festival_pos_active_view', normalized);
+      } catch (e) {}
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentView]);
+
+  // Authentication & Role-based permissions (persisted across page refresh)
+  const [userRole, setUserRoleState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('festival_pos_user_role') || localStorage.getItem('festival_pos_user_role');
+        if (saved === 'admin' || saved === 'cashier') return saved;
+      } catch (e) {}
     }
-    return 'billing';
+    return 'cashier'; // default cashier for desktop speed
   });
 
-  // Authentication & Role-based permissions
-  // Roles: 'cashier' | 'admin'
-  const [userRole, setUserRole] = useState('cashier'); // default cashier for desktop speed
-  const [currentUserName, setCurrentUserName] = useState('Cashier 1');
+  const [currentUserName, setCurrentUserNameState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('festival_pos_user_name') || localStorage.getItem('festival_pos_user_name');
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return 'Cashier 1';
+  });
+
+  const setUserRole = useCallback((role) => {
+    setUserRoleState(role);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('festival_pos_user_role', role);
+        localStorage.setItem('festival_pos_user_role', role);
+      } catch (e) {}
+    }
+  }, []);
+
+  const setCurrentUserName = useCallback((name) => {
+    setCurrentUserNameState(name);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('festival_pos_user_name', name);
+        localStorage.setItem('festival_pos_user_name', name);
+      } catch (e) {}
+    }
+  }, []);
+
   const isAdmin = userRole === 'admin';
 
   // Products from Database
